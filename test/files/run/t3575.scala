@@ -1,5 +1,8 @@
 // This is here to tell me if the behavior changes, not because
 // the output is endorsed.
+
+import scala.Specializable.Group
+
 case class Two[
   @specialized A,
   @specialized B
@@ -13,6 +16,16 @@ case class TwoLong[
 case class TwoCool[
   @specialized(Specializable.Everything) A,
   @specialized(Specializable.Everything) B
+](v: A, w: B)
+
+case class TwoImplicitGroups[
+  @specialized((Char, Boolean, Byte, Short, Int, Long, Float, Double, Unit, AnyRef)) A,
+  @specialized((Char, Boolean, Byte, Short, Int, Long, Float, Double, Unit, AnyRef)) B
+](v: A, w: B)
+
+case class TwoGroups[
+  @specialized(Group(Char, Boolean, Byte, Short, Int, Long, Float, Double, Unit, AnyRef)) A,
+  @specialized(Group(Char, Boolean, Byte, Short, Int, Long, Float, Double, Unit, AnyRef)) B
 ](v: A, w: B)
 
 case class TwoShort[
@@ -41,6 +54,16 @@ object Test {
     println(TwoCool(12, "Hello").getClass().getName());
     println(TwoCool("Hello", 12).getClass().getName());
     println(TwoCool(12, 12).getClass().getName());
+
+    println(TwoGroups("Hello", "World").getClass().getName());
+    println(TwoGroups(12, "Hello").getClass().getName());
+    println(TwoGroups("Hello", 12).getClass().getName());
+    println(TwoGroups(12, 12).getClass().getName());
+
+    println(TwoImplicitGroups("Hello", "World").getClass().getName());
+    println(TwoImplicitGroups(12, "Hello").getClass().getName());
+    println(TwoImplicitGroups("Hello", 12).getClass().getName());
+    println(TwoImplicitGroups(12, 12).getClass().getName());
 
     println(TwoShort("Hello", "World").getClass().getName());
     println(TwoShort(12, "Hello").getClass().getName());
