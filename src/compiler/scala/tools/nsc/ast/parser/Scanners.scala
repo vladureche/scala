@@ -139,6 +139,28 @@ trait Scanners extends ScannersCommon {
       docBuffer = null
       ret
     }
+    
+    /** Check if an area contains whitespaces, required for placing comments */
+    def isWhitespace(begin: Int, end: Int): Boolean = {
+      // sanity checks, rather crash fast than hide an error
+      assert(begin > 0)
+      assert(end < buf.length)
+      assert(begin < end)
+      var i = begin
+            
+      while (i < end - 1) {
+        val ch = buf(i)
+        if (ch != ' ' && 
+            ch != '\t' && 
+            ch != LF && 
+            ch != CR && 
+            ch != FF) /* FF is not documented or used anywhere, 
+                         but I've seen it in the whitespace skipping in fetchToken */
+          return false
+        i += 1
+      }
+      true
+    }
 
     /** add the given character to the documentation buffer
      */

@@ -655,14 +655,17 @@ self =>
       if ((doc ne null) && doc.raw.length > 0) {
         val joined = trees map {
           t =>
-            DocDef(doc, t) setPos {
-              if (t.pos.isDefined) {
-                val pos = doc.pos.withEnd(t.pos.endOrPoint)
-                if (t.pos.isOpaqueRange) pos else pos.makeTransparent
-              } else {
-                t.pos
+            if (in.isWhitespace(doc.pos.endOrPoint + 1, t.pos.startOrPoint))            
+              DocDef(doc, t) setPos {
+                if (t.pos.isDefined) {
+                  val pos = doc.pos.withEnd(t.pos.endOrPoint)
+                  if (t.pos.isOpaqueRange) pos else pos.makeTransparent
+                } else {
+                  t.pos
+                }
               }
-            }
+            else
+              t
         }
         joined.find(_.pos.isOpaqueRange) foreach {
           main =>
@@ -2967,9 +2970,9 @@ self =>
       val annots = annotations(true)
       val pos = in.offset
       val mods = (localModifiers() | implicitMod) withAnnotations annots
-      val defs = joinComment( // for SI-5527
+      val defs =
         if (!(mods hasFlag ~(Flags.IMPLICIT | Flags.LAZY))) defOrDcl(pos, mods)
-        else List(tmplDef(pos, mods)))
+        else List(tmplDef(pos, mods))
 
       in.token match {
         case RBRACE | CASE  => defs :+ (Literal(Constant()) setPos o2p(in.offset))
