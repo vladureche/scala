@@ -33,6 +33,14 @@ abstract class UnPickler /*extends reflect.generic.UnPickler*/ {
    *  @param filename   filename associated with bytearray, only used for error messages
    */
   def unpickle(bytes: Array[Byte], offset: Int, classRoot: Symbol, moduleRoot: Symbol, filename: String) {
+    
+    println("\nUNPICKLING:")
+    println("  class:  " + classRoot)
+    println("  module: " + moduleRoot)
+    println("  file:   " + filename)
+    println("  stack:  ")
+    println(Thread.currentThread.getStackTrace.mkString("    at ", "\n    at ", "\n\n\n"))
+    
     try {
       new Scan(bytes, offset, classRoot, moduleRoot, filename).run()
     } catch {

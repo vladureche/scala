@@ -4120,7 +4120,7 @@ trait Types extends api.Types { self: SymbolTable =>
                         appliedType(as.head, args mapConserve (this)) // @M: was as.head
                       else instParamRelaxed(ps.tail, as.tail)
 
-                    //Console.println("instantiating " + sym + " from " + basesym + " with " + basesym.typeParams + " and " + baseargs+", pre = "+pre+", symclazz = "+symclazz);//DEBUG
+                    println("instantiating " + sym + " from " + basesym + " with " + basesym.typeParams + " and " + baseargs+", pre = "+pre+", symclazz = "+symclazz);//DEBUG
                     if (sameLength(basesym.typeParams, baseargs))
                       instParam(basesym.typeParams, baseargs)
                     else

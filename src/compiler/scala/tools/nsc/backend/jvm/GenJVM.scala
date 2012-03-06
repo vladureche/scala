@@ -680,7 +680,15 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
     )
     def addGenericSignature(jmember: JMember, sym: Symbol, owner: Symbol) {
       if (needsGenericSignature(sym)) {
+        println("parent = " + owner)
+        println("  signature after erasure: " + owner.thisType)
+        println("  signature before erasure: " + beforeErasure(owner.thisType))
+        println("we want child info: " + sym)
+        println("  signature after erasure: " + owner.thisType.memberInfo(sym))
+        println("  now computing it before erasure")
         val memberTpe = beforeErasure(owner.thisType.memberInfo(sym))
+        println("  signature before erasure: " + memberTpe + "\n")
+        println
         // println("addGenericSignature sym: " + sym.fullName + " : " + memberTpe + " sym.info: " + sym.info)
         // println("addGenericSignature: "+ (sym.ownerChain map (x => (x.name, x.isImplClass))))
         erasure.javaSig(sym, memberTpe) foreach { sig =>
@@ -790,6 +798,10 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
         else
           innerSym.rawname + innerSym.moduleSuffix
 
+      println("Generating inner classes")
+      println("class: " + clasz.symbol)
+      println("module:" + clasz.symbol.linkedClassOfClass)
+      
       // add inner classes which might not have been referenced yet
       afterErasure {
         for (sym <- List(clasz.symbol, clasz.symbol.linkedClassOfClass); m <- sym.info.decls.map(innerClassSymbolFor) if m.isClass)

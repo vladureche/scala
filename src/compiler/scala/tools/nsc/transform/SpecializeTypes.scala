@@ -511,7 +511,15 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
        *  was both already used for a map and mucho long.  So "sClass" is the
        *  specialized subclass of "clazz" throughout this file.
        */
-      val sClass = clazz.owner.newClass(specializedName(clazz, env0).toTypeName, clazz.pos, (clazz.flags | SPECIALIZED) & ~CASE)
+      // If a member already exists as a lazy type, access info to read it and hopefully it will automatically cancel
+      // itself
+      val clazzName = specializedName(clazz, env0).toTypeName
+      val alreadyThere = clazz.owner.info.decl(clazzName)
+      
+      println("Specializing " + clazz + " found " + alreadyThere + " already there")
+      //alreadyThere.info
+      
+      val sClass = clazz.owner.newClass(clazzName, clazz.pos, (clazz.flags | SPECIALIZED) & ~CASE)
 
       def cloneInSpecializedClass(member: Symbol, flagFn: Long => Long) =
         member.cloneSymbol(sClass, flagFn(member.flags | SPECIALIZED))
