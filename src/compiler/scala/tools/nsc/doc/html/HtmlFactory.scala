@@ -11,6 +11,7 @@ import model._
 import java.io.{ File => JFile }
 import io.{ Streamable, Directory }
 import scala.collection._
+import scala.tools.nsc.doc.html.page.Template
 
 /** A class that can generate Scaladoc sites to some fixed root folder.
   * @author David Bernard
@@ -112,6 +113,9 @@ class HtmlFactory(val universe: doc.Universe, index: doc.Index) {
     for (letter <- index.firstLetterIndex) {
       new html.page.ReferenceIndex(letter._1, index, universe) writeFor this
     }
+    println("Stats:")
+    println(" - max children: " + Template.maxChildren)
+    println(" - max parents: " + Template.maxParents)
   }
 
   def writeTemplates(writeForThis: HtmlPage => Unit) {

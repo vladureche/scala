@@ -10,6 +10,12 @@ package page
 
 import model._
 import scala.xml.{ NodeSeq, Text, UnprefixedAttribute }
+import org.apache.tools.ant.util.StringUtils
+
+object Template {
+  var maxParents = 0
+  var maxChildren = 0
+}
 
 class Template(tpl: DocTemplateEntity) extends HtmlPage {
 
@@ -481,7 +487,10 @@ class Template(tpl: DocTemplateEntity) extends HtmlPage {
         <div class="toggleContainer block">
           <span class="toggle">Known Subclasses</span>
           <div class="subClasses hiddenContent">{
-            templatesToHtml(dtpl.subClasses.sortBy(_.name), xml.Text(", "))
+            {
+              if (dtpl.subClasses.length > Template.maxChildren)
+                Template.maxChildren = dtpl.subClasses.length 
+              templatesToHtml(dtpl.subClasses.sortBy(_.name), xml.Text(", "))}
           }</div>
         </div>
       case _ => NodeSeq.Empty
@@ -614,7 +623,16 @@ class Template(tpl: DocTemplateEntity) extends HtmlPage {
         }{ if (isReduced) NodeSeq.Empty else {
           mbr match {
             case tpl: DocTemplateEntity if tpl.parentType.isDefined =>
-              <span class="result"> extends { typeToHtml(tpl.parentType.get, hasLinks) }</span>
+              <span class="result"> extends { 
+                var occurences = 1 // all classes have either AnyVal or AnyRef as parents :)
+                var index = 0
+                while (tpl.parentType.get.name.indexOf(" with ", index) != -1) {
+                  occurences += 1
+                  index = tpl.parentType.get.name.indexOf(" with ", index) + 1
+                }
+                if (occurences > Template.maxParents)
+                  Template.maxParents = occurences
+                typeToHtml(tpl.parentType.get, hasLinks) }</span>
 
             case tme: MemberEntity if (tme.isDef || tme.isVal || tme.isLazyVal || tme.isVar) =>
               <span class="result">: { typeToHtml(tme.resultType, hasLinks) }</span>
