@@ -17,7 +17,7 @@ import model.{ RootPackage => RootPackageEntity }
 
 /** This trait extracts all required information for documentation from compilation units */
 class ModelFactory(val global: Global, val settings: doc.Settings) {
-  thisFactory: ModelFactory with CommentFactory with TreeFactory =>
+  thisFactory: ModelFactory with ModelFactoryImplicitSupport with CommentFactory with TreeFactory =>
 
   import global._
   import definitions.{ ObjectClass, RootPackage, EmptyPackage, NothingClass, AnyClass, AnyValClass, AnyRefClass }
@@ -95,7 +95,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     def isDocTemplate = false
   }
 
-  abstract class MemberImpl(sym: Symbol, inTpl: => DocTemplateImpl) extends EntityImpl(sym, inTpl) with MemberEntity {
+  abstract class MemberImpl(sym: Symbol, implConv: ImplicitConversion = null, inTpl: => DocTemplateImpl) extends EntityImpl(sym, inTpl) with MemberEntity {
     lazy val comment =
       if (inTpl == null) None else thisFactory.comment(sym, inTpl)
     override def inTemplate = inTpl
@@ -176,12 +176,13 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
       ((!sym.isTrait && ((sym hasFlag Flags.ABSTRACT) || (sym hasFlag Flags.DEFERRED))) ||
       sym.isAbstractClass || sym.isAbstractType) && !sym.isSynthetic
     def isTemplate = false
+    def implicitConversion = if (implConv ne null) Some(implConv) else None
   }
 
    /** The instantiation of `TemplateImpl` triggers the creation of the following entities:
     *  All ancestors of the template and all non-package members.
     */
-  abstract class DocTemplateImpl(sym: Symbol, inTpl: => DocTemplateImpl) extends MemberImpl(sym, inTpl) with TemplateImpl with HigherKindedImpl with DocTemplateEntity {
+  abstract class DocTemplateImpl(sym: Symbol, inTpl: => DocTemplateImpl) extends MemberImpl(sym, null, inTpl) with TemplateImpl with HigherKindedImpl with DocTemplateEntity {
     //if (inTpl != null) println("mbr " + sym + " in " + (inTpl.toRoot map (_.sym)).mkString(" > "))
     if (settings.verbose.value)
       inform("Creating doc template for " + sym)
@@ -245,11 +246,16 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     }
     def subClasses = if (subClassesCache == null) Nil else subClassesCache.toList
 
-    protected lazy val memberSyms =
+    lazy val memberSyms =
        // Only this class's constructors are part of its members, inherited constructors are not.
       sym.info.members.filter(s => localShouldDocument(s) && (!s.isConstructor || s.owner == sym) && !isPureBridge(sym) )
 
-    val members       = memberSyms flatMap (makeMember(_, this))
+    val memberNames = sym.info.members.map(_.name).toSet
+    val implicitMembers = membersByImplicitConversions(sym, this).filterNot { case (sym, implConv) => memberNames.contains(sym.name) }    
+    val membersMap = (memberSyms flatMap { case sym => makeMember(sym, null, this).map((sym, _))}) ::: 
+                     (implicitMembers flatMap { case (sym, implConv) => makeMember(sym, implConv, this).map((sym, _))})
+
+    val members       = membersMap map { case (sym, tpl) => tpl }
     val templates     = members collect { case c: DocTemplateEntity => c }
     val methods       = members collect { case d: Def => d }
     val values        = members collect { case v: Val => v }
@@ -273,14 +279,14 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
 
   abstract class RootPackageImpl(sym: Symbol) extends PackageImpl(sym, null) with RootPackageEntity
 
-  abstract class NonTemplateMemberImpl(sym: Symbol, inTpl: => DocTemplateImpl) extends MemberImpl(sym, inTpl) with NonTemplateMemberEntity {
+  abstract class NonTemplateMemberImpl(sym: Symbol, implConv: ImplicitConversion, inTpl: => DocTemplateImpl) extends MemberImpl(sym, implConv, inTpl) with NonTemplateMemberEntity {
     override def qualifiedName = optimize(inTemplate.qualifiedName + "#" + name)
     lazy val definitionName = optimize(inDefinitionTemplates.head.qualifiedName + "#" + name)
     def isUseCase = sym.isSynthetic
     def isBridge = sym.isBridge
   }
 
-  abstract class NonTemplateParamMemberImpl(sym: Symbol, inTpl: => DocTemplateImpl) extends NonTemplateMemberImpl(sym, inTpl) {
+  abstract class NonTemplateParamMemberImpl(sym: Symbol, implConv: ImplicitConversion, inTpl: => DocTemplateImpl) extends NonTemplateMemberImpl(sym, implConv, inTpl) {
     def valueParams =
       sym.paramss map { ps => (ps.zipWithIndex) map { case (p, i) =>
         if (p.nameString contains "$") makeValueParam(p, inTpl, optimize("arg" + i)) else makeValueParam(p, inTpl)
@@ -356,7 +362,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
             override def qualifiedName = "_root_"
             override def inheritedFrom = Nil
             override def isRootPackage = true
-            override protected lazy val memberSyms =
+            override lazy val memberSyms =
               (bSym.info.members ++ EmptyPackage.info.members) filter { s =>
                 s != EmptyPackage && s != RootPackage
               }
@@ -454,18 +460,18 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
   }
 
   /** */
-  def makeMember(aSym: Symbol, inTpl: => DocTemplateImpl): List[MemberImpl] = {
+  def makeMember(aSym: Symbol, implConv: ImplicitConversion, inTpl: => DocTemplateImpl): List[MemberImpl] = {
 
     def makeMember0(bSym: Symbol, _useCaseOf: Option[MemberImpl]): Option[MemberImpl] = {
       if (bSym.isGetter && bSym.isLazy)
-          Some(new NonTemplateMemberImpl(bSym, inTpl) with Val {
+          Some(new NonTemplateMemberImpl(bSym, implConv, inTpl) with Val {
             override lazy val comment = // The analyser does not duplicate the lazy val's DocDef when it introduces its accessor.
               thisFactory.comment(bSym.accessed, inTpl) // This hack should be removed after analyser is fixed.
             override def isLazyVal = true
             override def useCaseOf = _useCaseOf
           })
       else if (bSym.isGetter && bSym.accessed.isMutable)
-        Some(new NonTemplateMemberImpl(bSym, inTpl) with Val {
+        Some(new NonTemplateMemberImpl(bSym, implConv, inTpl) with Val {
           override def isVar = true
           override def useCaseOf = _useCaseOf
         })
@@ -481,29 +487,29 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
           }
           else bSym
         }
-        Some(new NonTemplateParamMemberImpl(cSym, inTpl) with HigherKindedImpl with Def {
+        Some(new NonTemplateParamMemberImpl(cSym, implConv, inTpl) with HigherKindedImpl with Def {
           override def isDef = true
           override def useCaseOf = _useCaseOf
         })
       }
       else if (bSym.isConstructor)
-        Some(new NonTemplateParamMemberImpl(bSym, inTpl) with Constructor {
+        Some(new NonTemplateParamMemberImpl(bSym, implConv, inTpl) with Constructor {
           override def isConstructor = true
           def isPrimary = sym.isPrimaryConstructor
           override def useCaseOf = _useCaseOf
         })
       else if (bSym.isGetter) // Scala field accessor or Java field
-        Some(new NonTemplateMemberImpl(bSym, inTpl) with Val {
+        Some(new NonTemplateMemberImpl(bSym, implConv, inTpl) with Val {
           override def isVal = true
           override def useCaseOf = _useCaseOf
         })
       else if (bSym.isAbstractType)
-        Some(new NonTemplateMemberImpl(bSym, inTpl) with TypeBoundsImpl with HigherKindedImpl with AbstractType {
+        Some(new NonTemplateMemberImpl(bSym, implConv, inTpl) with TypeBoundsImpl with HigherKindedImpl with AbstractType {
           override def isAbstractType = true
           override def useCaseOf = _useCaseOf
         })
       else if (bSym.isAliasType)
-        Some(new NonTemplateMemberImpl(bSym, inTpl) with HigherKindedImpl with AliasType {
+        Some(new NonTemplateMemberImpl(bSym, implConv, inTpl) with HigherKindedImpl with AliasType {
           override def isAliasType = true
           def alias = makeTypeInTemplateContext(sym.tpe.dealias, inTpl, sym)
           override def useCaseOf = _useCaseOf

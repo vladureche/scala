@@ -275,6 +275,14 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
     <p class="comment cmt">{ inlineToHtml(mbr.comment.get.short) }</p>
 
   def memberToCommentBodyHtml(mbr: MemberEntity, isSelf: Boolean, isReduced: Boolean = false): NodeSeq = {
+    
+    val implicitConversionInfo: Seq[scala.xml.Node] = mbr.implicitConversion match {
+       case Some(conv) =>
+               <div class="comment cmt">{ bodyToHtml(conv.getBody) }</div>
+       case _ =>
+               NodeSeq.Empty
+    }
+       
     val memberComment =
       if (mbr.comment.isEmpty) NodeSeq.Empty
       else <div class="comment cmt">{ commentToHtml(mbr.comment) }</div>
@@ -506,7 +514,7 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
       case _ => NodeSeq.Empty
     }
 
-    memberComment ++ paramComments ++ attributesBlock ++ linearization ++ subclasses
+    implicitConversionInfo ++ memberComment ++ paramComments ++ attributesBlock ++ linearization ++ subclasses
   }
 
   def kindToString(mbr: MemberEntity): String = {
@@ -566,7 +574,7 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
             val span = if (mbr.deprecation.isDefined)
               <span class={"name deprecated"} title={"Deprecated: "+bodyToStr(mbr.deprecation.get)}>{ value }</span>
             else
-              <span class={"name"}>{ value }</span>
+              <span class={ if (mbr.implicitConversion.isDefined) "nameImplicit" else "name" }>{ value }</span>
             val encoded = scala.reflect.NameTransformer.encode(value)
             if (encoded != value) {
               span % new UnprefixedAttribute("title",

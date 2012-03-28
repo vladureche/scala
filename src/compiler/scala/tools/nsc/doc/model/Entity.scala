@@ -166,7 +166,10 @@ trait MemberEntity extends Entity {
 
   /** Whether this member is abstract. */
   def isAbstract: Boolean
-
+  
+  /** If this member originates from an implicit conversion of the current class to something else we set the 
+   *  implicit information to the correct origin */
+  def implicitConversion: Option[ImplicitConversion]
 }
 object MemberEntity {
   // Oh contravariance, contravariance, wherefore art thou contravariance?
@@ -412,4 +415,30 @@ trait Annotation extends Entity {
   /** The arguments passed to the constructor of the annotation class. */
   def arguments: List[ValueArgument]
 
+}
+
+/** A trait that signals the member results from an implicit conversion */
+trait ImplicitConversion {
+  
+  /** The result type after the conversion */
+  def target: TypeEntity
+  
+  /** The entity for the method that performed the conversion, if it's documented (or just its name, otherwise) */
+  def convertorMethod: Either[MemberEntity, String]
+               
+  /** The entity that performed the conversion */
+  def convertorOwner: TemplateEntity    
+  
+  /** The constraints that the transformations puts on the type parameters */
+  def constraints: List[ConstraintEntity]
+  
+  /** The body of the comment */
+  def getBody: Body
+}
+
+/** A trait that encapsulates a constraint necessary for implicit conversion */
+trait ConstraintEntity {
+       
+       /** Returns the constraint text representing the actual constraint */
+       def getConstraintText: Block
 }
