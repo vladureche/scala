@@ -169,13 +169,14 @@ trait ModelFactoryImplicitSupport {
       val (simplifiedType, implicitParamConstraints) = removeImplicitParameters(res.tree.tpe, inTpl)
       val coercion = res.tree.setType(simplifiedType)   
     
-      // // this is weird: we might get a coercion with no type params?!? maybe it's 100% implicit and we explicitly apply it
-      // // TODO: Add this to the testsuite :)
-      // if (coercion.tpe.paramTypes.length != 1) {
-      //   debug("no parameters:")
-      //   deubg(simplifiedType)
-      //   return Nil
-      // }
+      // this is weird: we might get a coercion with no type params?!? maybe it's 100% implicit and we explicitly apply it
+      // TODO: Add this to the testsuite :)
+      if (coercion.tpe.paramTypes.length != 1) {
+        debug("no parameters:" + debug(simplifiedType.toString))
+        debug("  while transforming sym: " + sym)
+        debug("  with tree: " + res.tree)
+        return Nil
+      }
 
       // and get the view applied to an argument
       val viewApply = new ApplyImplicitView(coercion, List(Ident("<argument>") setType coercion.tpe.paramTypes.head))
