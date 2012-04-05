@@ -326,13 +326,14 @@ div.members > ol > li:last-child {
   font-weight: bold;
 }
 
-.signature .implicit {
+.signature .symbol > .implicit {
   display: inline-block;
   font-weight: bold;
   text-decoration: underline;
+  color: darkgreen;
 }
 
-.signature .symbol .params .implicit {
+.signature .symbol .params > .implicit {
   font-style: italic;
 }
 
@@ -363,10 +364,6 @@ div.members > ol > li:last-child {
 }
 
 #template .types .signature .name {
-  color: darkgreen;
-}
-
-#template .values .signature .implicit {
   color: darkgreen;
 }
 

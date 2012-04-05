@@ -259,7 +259,7 @@ function filter(scrollToMember) {
     var hiddenSuperclassesLinearization = hiddenSuperclassElementsLinearization.map(function() {
       return $(this).attr("name");
     }).get();
-    var hiddenSuperclassElementsImplicits = orderingAlphabetic ? $("#implicits > li.out") : $("#implicits > li:gt(0)");
+    var hiddenSuperclassElementsImplicits = orderingAlphabetic ? $("#implicits > li.out") : $("#implicits > li");
     var hiddenSuperclassesImplicits = hiddenSuperclassElementsImplicits.map(function() {
       return $(this).attr("name");
     }).get();
