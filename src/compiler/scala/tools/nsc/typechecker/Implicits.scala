@@ -374,16 +374,16 @@ trait Implicits {
     private def typedImplicit(info: ImplicitInfo, ptChecked: Boolean): SearchResult = {
       (context.openImplicits find { case (tp, sym) => sym == tree.symbol && dominates(pt, tp)}) match {
          case Some(pending) =>
-           // println("Pending implicit "+pending+" dominates "+pt+"/"+undetParams) //@MDEBUG
+           //println("Pending implicit "+pending+" dominates "+pt+"/"+undetParams) //@MDEBUG
            throw DivergentImplicit
          case None =>
            try {
              context.openImplicits = (pt, tree.symbol) :: context.openImplicits
-             // println("  "*context.openImplicits.length+"typed implicit "+info+" for "+pt) //@MDEBUG
+             //println("  "*context.openImplicits.length+"typed implicit "+info+" for "+pt) //@MDEBUG
              typedImplicit0(info, ptChecked)
            } catch {
              case ex: DivergentImplicit =>
-               // println("DivergentImplicit for pt:"+ pt +", open implicits:"+context.openImplicits) //@MDEBUG
+               //println("DivergentImplicit for pt:"+ pt +", open implicits:"+context.openImplicits) //@MDEBUG
                if (context.openImplicits.tail.isEmpty) {
                  if (!(pt.isErroneous))
                    DivergingImplicitExpansionError(tree, pt, info.sym)(context)
@@ -515,7 +515,7 @@ trait Implicits {
 
     private def typedImplicit0(info: ImplicitInfo, ptChecked: Boolean): SearchResult = {
       incCounter(plausiblyCompatibleImplicits)
-      printTyping(
+      printTyping (
         ptBlock("typedImplicit0",
           "info.name" -> info.name,
           "ptChecked" -> ptChecked,
@@ -1274,6 +1274,8 @@ trait Implicits {
         // each ImplicitInfo contributes a distinct set of constraints (generated indirectly by typedImplicit)
         // thus, start each type var off with a fresh for every typedImplicit
         resetTVars()
+        // any previous errors should not affect us now
+        context.flushBuffer()
         val res = typedImplicit(ii, false)
         if (res.tree ne EmptyTree) List((res, tvars map (_.constr)))
         else Nil

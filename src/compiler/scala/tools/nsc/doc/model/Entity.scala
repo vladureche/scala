@@ -167,9 +167,8 @@ trait MemberEntity extends Entity {
   /** Whether this member is abstract. */
   def isAbstract: Boolean
   
-  /** If this member originates from an implicit conversion of the current class to something else we set the 
-   *  implicit information to the correct origin */
-  def implicitConversion: Option[ImplicitConversion]
+  /** If this member originates from an implicit conversion, we set the implicit information to the correct origin */
+  def byConversion: Option[ImplicitConversion]
 }
 object MemberEntity {
   // Oh contravariance, contravariance, wherefore art thou contravariance?
@@ -248,7 +247,9 @@ trait DocTemplateEntity extends TemplateEntity with MemberEntity {
   /** The companion of this template, or none. If a class and an object are defined as a pair of the same name, the
     * other entity of the pair is the companion. */
   def companion: Option[DocTemplateEntity]
-
+  
+  /** The implicit conversions this template (class or trait, objects and packages are not affected) */
+  def conversions: List[ImplicitConversion]
 }
 
 
@@ -419,26 +420,96 @@ trait Annotation extends Entity {
 
 /** A trait that signals the member results from an implicit conversion */
 trait ImplicitConversion {
-  
+
+  /** The source of the implicit conversion*/
+  def source: DocTemplateEntity
+
   /** The result type after the conversion */
-  def target: TypeEntity
-  
+  def targetType: TypeEntity
+
   /** The entity for the method that performed the conversion, if it's documented (or just its name, otherwise) */
   def convertorMethod: Either[MemberEntity, String]
-               
+
+  /** A qualified name uniquely identifying the convertion (currently: the conversion method's qualified name) */
+  def conversionQualifiedName: String 
+
   /** The entity that performed the conversion */
-  def convertorOwner: TemplateEntity    
-  
+  def convertorOwner: TemplateEntity
+
   /** The constraints that the transformations puts on the type parameters */
-  def constraints: List[ConstraintEntity]
-  
-  /** The body of the comment */
-  def getBody: Body
+  def constraints: List[Constraint]
+
+  /** The members inherited by this implicit conversion */
+  def members: List[MemberEntity]
 }
 
 /** A trait that encapsulates a constraint necessary for implicit conversion */
-trait ConstraintEntity {
-       
-       /** Returns the constraint text representing the actual constraint */
-       def getConstraintText: Block
+trait Constraint {
+  // /** The implicit conversion during which this constraint appears */
+  // def conversion: ImplicitConversion
+}
+
+/** A constraint involving a type parameter which must be in scope */
+trait ImplicitInScopeConstraint extends Constraint {
+  /** The type of the implicit value required */
+  def implicitType: TypeEntity
+
+  /** toString for debugging */
+  override def toString = "an implicit _: " + implicitType.name + " must be in scope"
+}
+
+trait TypeClassConstraint extends ImplicitInScopeConstraint with TypeParamConstraint {
+  /** Type class name */
+  def typeClassEntity: TemplateEntity
+
+  /** toString for debugging */
+  override def toString = typeParamName + " is a class of type " + typeClassEntity.qualifiedName + " (" + typeParamName + ": " + typeClassEntity.name + ")"
+}
+
+trait KnownTypeClassConstraint extends TypeClassConstraint {
+  /** Type explanation */
+  def typeExplanation: String
+
+  /** toString for debugging */
+  override def toString = typeParamName + " " + typeExplanation + " (" + typeParamName + ": " + typeClassEntity.name + ")"
+}
+
+/** A constraint involving a type parameter */
+trait TypeParamConstraint extends Constraint {
+  /** The type parameter involved */
+  def typeParamName: String
+}
+
+trait EqualTypeParamConstraint extends TypeParamConstraint {
+  /** The rhs */
+  def rhs: TypeEntity
+  /** toString for debugging */
+  override def toString = typeParamName + " is " + rhs.name + " (" + typeParamName + " =:= " + rhs.name + ")"
+}
+
+trait BoundedTypeParamConstraint extends TypeParamConstraint {
+  /** The lower bound */
+  def lowerBound: TypeEntity
+
+  /** The upper bound */
+  def upperBound: TypeEntity
+
+  /** toString for debugging */
+  override def toString = typeParamName + " is a superclass of " + lowerBound.name + " and a subclass of " + upperBound.name + " (" + typeParamName + " >: " + lowerBound.name + " <: " + upperBound.name + ")"
+}
+
+trait LowerBoundedTypeParamConstraint extends TypeParamConstraint {
+  /** The lower bound */
+  def lowerBound: TypeEntity
+
+  /** toString for debugging */
+  override def toString = typeParamName + " is a superclass of " + lowerBound.name + " (" + typeParamName + " >: " + lowerBound.name + ")"
+}
+
+trait UpperBoundedTypeParamConstraint extends TypeParamConstraint {
+  /** The lower bound */
+  def upperBound: TypeEntity
+
+  /** toString for debugging */
+  override def toString = typeParamName + " is a subclass of " + upperBound.name + " (" + typeParamName + " <: " + upperBound.name + ")"
 }

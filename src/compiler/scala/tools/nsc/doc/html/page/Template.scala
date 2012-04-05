@@ -94,14 +94,26 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
               <ol><li class="alpha in"><span>Alphabetic</span></li><li class="inherit out"><span>By inheritance</span></li></ol>
             </div>
         }
-        { if (tpl.linearizationTemplates.isEmpty) NodeSeq.Empty else
+        { if (tpl.linearizationTemplates.isEmpty && tpl.conversions.isEmpty) NodeSeq.Empty else
             <div id="ancestors">
-              <span class="filtertype">Inherited</span>
-              <ol><li class="hideall out"><span>Hide All</span></li>
-              <li class="showall in"><span>Show all</span></li></ol>
-              <ol id="linearization">{
-                (tpl :: tpl.linearizationTemplates) map { wte => <li class="in" name={ wte.qualifiedName }><span>{ wte.name }</span></li> }
-              }</ol>
+              <span class="filtertype">Inherited<br/><a href="http://docs.scala-lang.org" target="_blank">Learn more</a></span>
+              <ol>
+                <li class="hideall out"><span>Hide All</span></li>
+                <li class="showall in"><span>Show all</span></li>
+              </ol>
+              { 
+                if (!tpl.linearization.isEmpty)
+                  <ol id="linearization">
+                    { (tpl :: tpl.linearizationTemplates).map(wte => <li class="in" name={ wte.qualifiedName }><span>{ wte.name }</span></li>) }
+                  </ol>
+                else NodeSeq.Empty 
+              } { 
+                if (!tpl.conversions.isEmpty)
+                  <ol id="implicits">
+                    { tpl.conversions.map(conv => <li class="in" name={ conv.conversionQualifiedName }><span>{ conv.targetType.name }</span></li>) }
+                  </ol>
+                else NodeSeq.Empty 
+              }
             </div>
         }
         {
@@ -152,19 +164,21 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
 
         <div id="inheritedMembers">
         {
+          // linearization
           NodeSeq fromSeq (for ((superTpl, superType) <- (tpl.linearizationTemplates zip tpl.linearizationTypes)) yield
             <div class="parent" name={ superTpl.qualifiedName }>
               <h3>Inherited from {
-                if (tpl.universe.settings.useStupidTypes.value)
-                  superTpl match {
-                    case dtpl: DocTemplateEntity =>
-                      val sig = signature(dtpl, false, true) \ "_"
-                      sig
-                    case tpl: TemplateEntity =>
-                      tpl.name
-                  }
-                else
-                  typeToHtml(superType, true)
+                typeToHtmlWithStupidTypes(tpl, superTpl, superType)
+              }</h3>
+            </div>
+          )
+        }
+        {
+          // implicitly inherited
+          NodeSeq fromSeq (for (conversion <- (tpl.conversions)) yield
+            <div class="conversion" name={ conversion.conversionQualifiedName }>
+              <h3>Inherited by implicit conversion to {
+                typeToHtml(conversion.targetType, true)
               }</h3>
             </div>
           )
@@ -275,14 +289,7 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
     <p class="comment cmt">{ inlineToHtml(mbr.comment.get.short) }</p>
 
   def memberToCommentBodyHtml(mbr: MemberEntity, isSelf: Boolean, isReduced: Boolean = false): NodeSeq = {
-    
-    val implicitConversionInfo: Seq[scala.xml.Node] = mbr.implicitConversion match {
-       case Some(conv) =>
-               <div class="comment cmt">{ bodyToHtml(conv.getBody) }</div>
-       case _ =>
-               NodeSeq.Empty
-    }
-       
+           
     val memberComment =
       if (mbr.comment.isEmpty) NodeSeq.Empty
       else <div class="comment cmt">{ commentToHtml(mbr.comment) }</div>
@@ -332,6 +339,42 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
           }</dl>
         }
       }
+    }
+
+    val implicitInformation = mbr.byConversion match {
+      case Some(conv) =>
+        <dt class="implicit">Implicit information</dt> 
+        <dd>
+        {
+          val targetType = typeToHtml(conv.targetType, true)
+          val conversionMethod = conv.convertorMethod match {
+            case Left(member) => Text(member.name)
+            case Right(name)  => Text(name)
+          }
+          val conversionOwnerName = conv.convertorOwner.qualifiedName
+
+          val constraintText = conv.constraints match {
+            case Nil =>
+              NodeSeq.Empty
+            case List(constraint) => 
+              <br/> ++ "This conversion will take place only if " ++ constraintToHtml(constraint) ++ "."
+            case List(constraint1, constraint2) =>
+              <br/> ++ "This conversion will take place only if " ++ constraintToHtml(constraint1) ++ 
+                       " and " ++ constraintToHtml(constraint2) ++ "."
+            case constraints => 
+              <br/> ++ "This conversion will take place only if all constraints are met:" ++
+                <ul>
+                  { constraints map { constraint => <li> { constraintToHtml(constraint) } </li> } }
+                </ul>
+          }
+
+          xml.Text("This member is added by an implicit conversion to ") ++ targetType ++ " performed by method " ++ 
+            conversionMethod ++ " in " ++ templateToHtml(conv.convertorOwner, conversionOwnerName) ++ "." ++
+            constraintText
+        }
+        </dd>
+      case _ =>
+        NodeSeq.Empty
     }
 
     // --- start attributes block vals
@@ -485,7 +528,7 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
     }
     // end attributes block vals ---
 
-    val attributesInfo = attributes ++ definitionClasses ++ fullSignature ++ selfType ++ annotations ++ deprecation ++ migration ++ sourceLink ++ mainComment
+    val attributesInfo = implicitInformation ++ attributes ++ definitionClasses ++ fullSignature ++ selfType ++ annotations ++ deprecation ++ migration ++ sourceLink ++ mainComment
     val attributesBlock =
       if (attributesInfo.isEmpty)
         NodeSeq.Empty
@@ -514,7 +557,7 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
       case _ => NodeSeq.Empty
     }
 
-    implicitConversionInfo ++ memberComment ++ paramComments ++ attributesBlock ++ linearization ++ subclasses
+    memberComment ++ paramComments ++ attributesBlock ++ linearization ++ subclasses
   }
 
   def kindToString(mbr: MemberEntity): String = {
@@ -569,12 +612,13 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
       </span>
       <span class="symbol">
         {
+          val nameClass = if (mbr.byConversion.isDefined) "implicit" else "name"
           val nameHtml = {
             val value = if (mbr.isConstructor) tpl.name else mbr.name
             val span = if (mbr.deprecation.isDefined)
-              <span class={"name deprecated"} title={"Deprecated: "+bodyToStr(mbr.deprecation.get)}>{ value }</span>
+              <span class={ nameClass + " deprecated"} title={"Deprecated: "+bodyToStr(mbr.deprecation.get)}>{ value }</span>
             else
-              <span class={ if (mbr.implicitConversion.isDefined) "nameImplicit" else "name" }>{ value }</span>
+              <span class={ nameClass }>{ value }</span>
             val encoded = scala.reflect.NameTransformer.encode(value)
             if (encoded != value) {
               span % new UnprefixedAttribute("title",
@@ -773,4 +817,25 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
     case _ => inl.toString
   }
 
+  private def typeToHtmlWithStupidTypes(tpl: TemplateEntity, superTpl: TemplateEntity, superType: TypeEntity): NodeSeq =
+    if (tpl.universe.settings.useStupidTypes.value)
+      superTpl match {
+        case dtpl: DocTemplateEntity =>
+          val sig = signature(dtpl, false, true) \ "_"
+          sig
+        case tpl: TemplateEntity =>
+          Text(tpl.name)
+      }
+  else
+    typeToHtml(superType, true)
+
+  private def constraintToHtml(constraint: Constraint): NodeSeq = xml.Text(constraint.toString)
+  // constraints match {
+  //   case impl: ImplicitInScopeConstraint =>
+  //     xml.Text(constraint.toString)
+  //   case bound: BoundedTypeParamConstraint => (bound.lowerBounds, bound.upperBounds) match {
+  //     case (List(lo), List(up)) if (lo == up) =>
+  //   }
+  // }
+    
 }

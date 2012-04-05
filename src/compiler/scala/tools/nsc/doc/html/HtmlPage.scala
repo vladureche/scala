@@ -164,10 +164,10 @@ abstract class HtmlPage extends Page { thisPage =>
   }
 
   /** Returns the HTML code that represents the template in `tpl` as a hyperlinked name. */
-  def templateToHtml(tpl: TemplateEntity) = tpl match {
+  def templateToHtml(tpl: TemplateEntity, name: String = null) = tpl match {
     case dTpl: DocTemplateEntity =>
       if (hasPage(dTpl)) {
-        <a href={ relativeLinkTo(dTpl) } class="extype" name={ dTpl.qualifiedName }>{ dTpl.name }</a>
+        <a href={ relativeLinkTo(dTpl) } class="extype" name={ dTpl.qualifiedName }>{ if (name eq null) dTpl.name else name }</a>
       } else {
         xml.Text(dTpl.name)
       }
