@@ -87,6 +87,38 @@ class Settings(error: String => Unit) extends scala.tools.nsc.Settings(error) {
     ""
   )
 
+  val docImplicits = BooleanSetting (
+    "-implicits",
+    "Document members inherited by implicit conversions."
+  )
+
+  val docImplicitsDebug = BooleanSetting (
+    "-implicits-debug",
+    "Show debugging information for members inherited by implicit conversions."
+  )
+
+  val docImplicitsShowAll = BooleanSetting (
+    "-implicits-show-all",
+    "Show members inherited by implicit conversions that are impossible in the default scope. " +
+    "(for example conversions that require Numeric[String] to be in scope)"
+  )
+
+  val docDiagrams = BooleanSetting (
+    "-diagrams",
+    "Create inheritance diagrams for classes, traits and packages."
+  )
+
+  val docDiagramsDebug = BooleanSetting (
+    "-diagrams-debug",
+    "Show debugging information for the diagram creation process."
+  )
+
+  val docDiagramsDotPath = PathSetting (
+    "-diagrams-dot-path",
+    "The path to the dot executable used to generate the inheritance diagrams. Ex: /usr/bin/dot",
+    "dot" // by default, just pick up the system-wide dot
+  )
+
   // Somewhere slightly before r18708 scaladoc stopped building unless the
   // self-type check was suppressed.  I hijacked the slotted-for-removal-anyway
   // suppress-vt-warnings option and renamed it for this purpose.
@@ -94,9 +126,28 @@ class Settings(error: String => Unit) extends scala.tools.nsc.Settings(error) {
 
   // For improved help output.
   def scaladocSpecific = Set[Settings#Setting](
-    docformat, doctitle, docfooter, docversion, docUncompilable, docsourceurl, docgenerator
+    docformat, doctitle, docfooter, docversion, docUncompilable, docsourceurl, docgenerator, docRootContent, useStupidTypes,
+    docDiagrams, docDiagramsDebug, docDiagramsDotPath,
+    docImplicits, docImplicitsDebug, docImplicitsShowAll
   )
   val isScaladocSpecific: String => Boolean = scaladocSpecific map (_.name)
 
   override def isScaladoc = true
+
+  /** 
+   * Set of classes to exclude from index and diagrams 
+   * TODO: Should be configurable, not hardcoded for the Scala Library
+   */
+  def isExcluded(qname: String) = {
+    ( ( qname.startsWith("scala.Tuple") || qname.startsWith("scala.Product") ||
+       qname.startsWith("scala.Function") || qname.startsWith("scala.runtime.AbstractFunction")
+     ) && !(
+      qname == "scala.Tuple1" || qname == "scala.Tuple2" ||
+      qname == "scala.Product" || qname == "scala.Product1" || qname == "scala.Product2" ||
+      qname == "scala.Function" || qname == "scala.Function1" || qname == "scala.Function2" ||
+      qname == "scala.runtime.AbstractFunction0" || qname == "scala.runtime.AbstractFunction1" ||
+      qname == "scala.runtime.AbstractFunction2"
+    )
+   )
+  }
 }
