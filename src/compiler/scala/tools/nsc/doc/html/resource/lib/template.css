@@ -687,10 +687,10 @@ div.fullcomment dl.paramcmts > dd {
   display: inline-block;
 }
 
-#mbrsel > div > ol > a {
+#mbrsel > div > a {
   position:relative;
-  top: 2px;
-  font-size: 10px;
+  top: -8px;
+  font-size: 11px;
   text-shadow: #ffffff 0 1px 0;
 }
 

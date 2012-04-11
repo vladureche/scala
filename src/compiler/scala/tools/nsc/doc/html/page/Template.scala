@@ -122,8 +122,8 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
               <li class="hideall out"><span>Hide All</span></li>
               <li class="showall in"><span>Show all</span></li>
             </ol>
+            <a href="http://docs.scala-lang.org/scaladoc/usage.html#members" target="_blank">Learn more about member selection</a>
           </div>
-          // <a href="http://docs.scala-lang.org" target="_blank">Learn more</a></span>
         }
         {
           <div id="visbl">
