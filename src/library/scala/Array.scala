@@ -467,6 +467,14 @@ object Array extends FallbackArrayBuilding {
  *  @version 1.0
  *  @see [[http://www.scala-lang.org/docu/files/collections-api/collections_38.html#anchor "The Scala 2.8 Collections' API"]]
  *  section on `Array` by Martin Odersky for more information.
+ *  @define coll array
+ *  @define Coll Array
+ *  @define orderDependent
+ *  @define orderDependentFold
+ *  @define mayNotTerminateInf
+ *  @define willNotTerminateInf
+ *  @define collectExample
+ *  @define undefinedorder
  */
 final class Array[T](_length: Int) extends java.io.Serializable with java.lang.Cloneable {
 

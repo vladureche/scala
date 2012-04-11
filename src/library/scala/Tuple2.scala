@@ -54,6 +54,15 @@ case class Tuple2[@specialized(Int, Long, Double, Char, Boolean, AnyRef) +T1, @s
   def zipped[Repr1, El1, Repr2, El2](implicit w1: T1 => TLike[El1, Repr1], w2: T2 => ILike[El2, Repr2]): Zipped[Repr1, El1, Repr2, El2]
     = new Zipped[Repr1, El1, Repr2, El2](_1, _2)
 
+  /**
+   *  @define coll zipped
+   *  @define Coll Zipped
+   *  @define orderDependent
+   *  @define orderDependentFold
+   *  @define mayNotTerminateInf
+   *  @define willNotTerminateInf
+   *  @define collectExample
+   */
   class Zipped[+Repr1, +El1, +Repr2, +El2](coll1: TLike[El1, Repr1], coll2: ILike[El2, Repr2]) { // coll2: ILike for filter
     def map[B, To](f: (El1, El2) => B)(implicit cbf: CBF[Repr1, B, To]): To = {
       val b = cbf(coll1.repr)

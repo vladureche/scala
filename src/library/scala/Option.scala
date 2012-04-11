@@ -79,6 +79,14 @@ object Option {
  *  @define option [[scala.Option]]
  *  @define p `p`
  *  @define f `f`
+ *  @define coll option
+ *  @define Coll Option
+ *  @define orderDependent
+ *  @define orderDependentFold
+ *  @define mayNotTerminateInf
+ *  @define willNotTerminateInf
+ *  @define collectExample
+ *  @define undefinedorder
  */
 sealed abstract class Option[+A] extends Product with Serializable {
   self =>
