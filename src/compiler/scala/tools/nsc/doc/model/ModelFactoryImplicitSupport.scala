@@ -34,10 +34,10 @@ import model.{ RootPackage => RootPackageEntity }
  *
  *      class C extends B { 
  *        def bar = 2 
- *        class D
+ *        class implicit
  *      }
  *
- *      implicit def conv(a: A) = new C
+ *      D def conv(a: A) = new C
  *    }
  * }}}
  *
@@ -99,7 +99,7 @@ trait ModelFactoryImplicitSupport {
       if (convSym != NoSymbol)
         makeTemplate(convSym.owner)
       else {
-        error("Implicit conversion from " + sym.tpe + " to " + toType + " done by " + convSym + " = NoSymbol!")
+        error("Scaladoc implicits: Implicit conversion from " + sym.tpe + " to " + toType + " done by " + convSym + " = NoSymbol!")
         makeRootPackage.get // surely the root package was created :)
       }
     
@@ -249,8 +249,8 @@ trait ModelFactoryImplicitSupport {
         
         List(new ImplicitConversionImpl(sym, result.tree.symbol, toType, constraints, inTpl))
       } catch {
-        case i: ImplicitNotFound => 
-          error("eliminating conversion from " + sym + " to " + toType + " because: " + i.toString)
+        case i: ImplicitNotFound =>
+          //println("  Eliminating: " + toType)
           Nil
       }
     }
@@ -263,9 +263,10 @@ trait ModelFactoryImplicitSupport {
       
       var available: Option[Boolean] = None
 
+
       // look for type variables in the type. If there are none, we can decide if the implicit is there or not
-      if (typeVarsInType(tpe).isEmpty) {
-        try {
+      if (implType.isTrivial) {
+        try {          
           context.flushBuffer() /* any errors here should not prevent future findings */
           val search = inferImplicit(EmptyTree, tpe, false, false, context, false)
           context.flushBuffer() /* any errors here should not prevent future findings */
@@ -281,7 +282,7 @@ trait ModelFactoryImplicitSupport {
         case Some(false) if (!implicitsShowAll) => 
           // if -implicits-show-all is not set, we get rid of impossible conversions (such as Numeric[String])
           throw new ImplicitNotFound(implType)
-        case None =>
+        case _ =>
           val typeParamNames = sym.typeParams.map(_.name)
 
           // TODO: This is maybe the worst hack I ever did - it's as dirty as hell, but it seems to work, so until I
@@ -315,7 +316,7 @@ trait ModelFactoryImplicitSupport {
     (subst.from zip subst.to) map {
       case (from, to) =>             
         new EqualTypeParamConstraint {
-          error("Unexpected type substitution constraint from:" + from + " to: " + to)
+          error("Scaladoc implicits: Unexpected type substitution constraint from: " + from + " to: " + to)
           val typeParamName = from.toString
           val rhs = makeType(to, inTpl)
         }
@@ -351,7 +352,7 @@ trait ModelFactoryImplicitSupport {
               })
             case other =>
               // this is likely an error on the lub/glb side
-              error("error computing lub/glb for: " + (tparam, constr) + ":\n" + other)
+              error("Scaladoc implicits: Error computing lub/glb for: " + (tparam, constr) + ":\n" + other)
               Nil
           }
         }
@@ -464,11 +465,11 @@ object hardcoded {
     List("scala.Predef.any2stringfmt", "scala.Predef.any2stringadd", "scala.Predef.any2ArrowAssoc", "scala.Predef.any2Ensuring")
 
   /** The common conversions and the text */
-  val knownTypeClasses: Map[String, String] = Map() +
-    ("<root>.scala.package.Numeric"       -> "is a numeric class, such as Int, Long, Float or Double") +
-    ("<root>.scala.package.Integral"      -> "is an integral numeric class, such as Int or Long") +
-    ("<root>.scala.package.Fractional"    -> "is a fractional numeric class, such as Float or Double") +
-    ("<root>.scala.reflect.Manifest"      -> "is accompanied by a Manifest, which is a runtime representation of its type that survives erasure") + 
-    ("<root>.scala.reflect.ClassManifest" -> "is accompanied by a ClassManifest, which is a runtime representation of its type that survives erasure") + 
-    ("<root>.scala.reflect.OptManifest"   -> "is accompanied by an OptManifest, which can be either a runtime representation of its type or the NoManifest, which means the runtime type is not available")
+  val knownTypeClasses: Map[String, String => String] = Map() +
+    ("<root>.scala.package.Numeric"       -> ((tparam: String) => tparam + " is a numeric class, such as Int, Long, Float or Double")) +
+    ("<root>.scala.package.Integral"      -> ((tparam: String) => tparam + " is an integral numeric class, such as Int or Long")) +
+    ("<root>.scala.package.Fractional"    -> ((tparam: String) => tparam + " is a fractional numeric class, such as Float or Double")) +
+    ("<root>.scala.reflect.Manifest"      -> ((tparam: String) => tparam + " is accompanied by a Manifest, which is a runtime representation of its type that survives erasure")) + 
+    ("<root>.scala.reflect.ClassManifest" -> ((tparam: String) => tparam + " is accompanied by a ClassManifest, which is a runtime representation of its type that survives erasure")) + 
+    ("<root>.scala.reflect.OptManifest"   -> ((tparam: String) => tparam + " is accompanied by an OptManifest, which can be either a runtime representation of its type or the NoManifest, which means the runtime type is not available"))
 }

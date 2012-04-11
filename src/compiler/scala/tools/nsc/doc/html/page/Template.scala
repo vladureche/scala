@@ -368,15 +368,15 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
             case Nil =>
               NodeSeq.Empty
             case List(constraint) => 
-              <br/> ++ "This conversion will take place only if " ++ constraintToHtml(constraint) ++ "."
+              xml.Text("This conversion will take place only if ") ++ constraintToHtml(constraint) ++ xml.Text(".")
             case List(constraint1, constraint2) =>
-              <br/> ++ "This conversion will take place only if " ++ constraintToHtml(constraint1) ++ 
-                       " and " ++ constraintToHtml(constraint2) ++ "."
+              xml.Text("This conversion will take place only if ") ++ constraintToHtml(constraint1) ++ 
+                xml.Text(" and at the same time ") ++ constraintToHtml(constraint2) ++ xml.Text(".")
             case constraints => 
-              <br/> ++ "This conversion will take place only if all constraints are met:" ++
-                <ul>
-                  { constraints map { constraint => <li> { constraintToHtml(constraint) } </li> } }
-                </ul>
+              <br/> ++ "This conversion will take place only if all of the following constraints are met:" ++ <br/> ++ {
+                var index = 0
+                constraints map { constraint => xml.Text({ index += 1; index } + ". ") ++ constraintToHtml(constraint) ++ <br/> }
+              }
           }
 
           <dd>
@@ -841,13 +841,31 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
   else
     typeToHtml(superType, true)
 
-  private def constraintToHtml(constraint: Constraint): NodeSeq = xml.Text(constraint.toString)
-  // constraints match {
-  //   case impl: ImplicitInScopeConstraint =>
-  //     xml.Text(constraint.toString)
-  //   case bound: BoundedTypeParamConstraint => (bound.lowerBounds, bound.upperBounds) match {
-  //     case (List(lo), List(up)) if (lo == up) =>
-  //   }
-  // }
+  private def constraintToHtml(constraint: Constraint): NodeSeq = constraint match {
+    case ktcc: KnownTypeClassConstraint =>
+      xml.Text(ktcc.typeExplanation(ktcc.typeParamName) + " (" + ktcc.typeParamName + ": ") ++ 
+        templateToHtml(ktcc.typeClassEntity) ++ xml.Text(")")
+    case tcc: TypeClassConstraint =>
+      xml.Text(tcc.typeParamName + " is ") ++ 
+        <a href="http://stackoverflow.com/questions/2982276/what-is-a-context-bound-in-scala" target="_blank">
+        context-bounded</a> ++ xml.Text(" by " + tcc.typeClassEntity.qualifiedName + " (" + tcc.typeParamName + ": ") ++ 
+        templateToHtml(tcc.typeClassEntity) ++ xml.Text(")")
+    case impl: ImplicitInScopeConstraint =>
+      xml.Text("an implicit _: ") ++ typeToHtml(impl.implicitType, true) ++ xml.Text(" must be in scope")
+    case eq: EqualTypeParamConstraint =>
+      xml.Text(eq.typeParamName + " is " + eq.rhs.name + " (" + eq.typeParamName + " =:= ") ++ 
+        typeToHtml(eq.rhs, true) ++ xml.Text(")")
+    case bt: BoundedTypeParamConstraint =>
+      xml.Text(bt.typeParamName + " is a superclass of " + bt.lowerBound.name + " and a subclass of " + 
+        bt.upperBound.name + " (" + bt.typeParamName + " >: ") ++ 
+        typeToHtml(bt.lowerBound, true) ++ xml.Text(" <: ") ++ 
+        typeToHtml(bt.upperBound, true) ++ xml.Text(")")
+    case lb: LowerBoundedTypeParamConstraint =>
+      xml.Text(lb.typeParamName + " is a superclass of " + lb.lowerBound.name + " (" + lb.typeParamName + " >: ") ++ 
+        typeToHtml(lb.lowerBound, true) ++ xml.Text(")")
+    case ub: UpperBoundedTypeParamConstraint =>
+      xml.Text(ub.typeParamName + " is a subclass of " + ub.upperBound.name + " (" + ub.typeParamName + " <: ") ++ 
+        typeToHtml(ub.upperBound, true) ++ xml.Text(")")
+  }
     
 }

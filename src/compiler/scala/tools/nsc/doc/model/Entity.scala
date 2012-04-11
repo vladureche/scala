@@ -466,15 +466,16 @@ trait TypeClassConstraint extends ImplicitInScopeConstraint with TypeParamConstr
   def typeClassEntity: TemplateEntity
 
   /** toString for debugging */
-  override def toString = typeParamName + " is a class of type " + typeClassEntity.qualifiedName + " (" + typeParamName + ": " + typeClassEntity.name + ")"
+  override def toString = typeParamName + " is a class of type " + typeClassEntity.qualifiedName + " (" + 
+    typeParamName + ": " + typeClassEntity.name + ")"
 }
 
 trait KnownTypeClassConstraint extends TypeClassConstraint {
-  /** Type explanation */
-  def typeExplanation: String
+  /** Type explanation, takes the type parameter name and generates the explanation */
+  def typeExplanation: (String) => String
 
   /** toString for debugging */
-  override def toString = typeParamName + " " + typeExplanation + " (" + typeParamName + ": " + typeClassEntity.name + ")"
+  override def toString = typeExplanation(typeParamName) + " (" + typeParamName + ": " + typeClassEntity.name + ")"
 }
 
 /** A constraint involving a type parameter */
@@ -498,7 +499,8 @@ trait BoundedTypeParamConstraint extends TypeParamConstraint {
   def upperBound: TypeEntity
 
   /** toString for debugging */
-  override def toString = typeParamName + " is a superclass of " + lowerBound.name + " and a subclass of " + upperBound.name + " (" + typeParamName + " >: " + lowerBound.name + " <: " + upperBound.name + ")"
+  override def toString = typeParamName + " is a superclass of " + lowerBound.name + " and a subclass of " + 
+    upperBound.name + " (" + typeParamName + " >: " + lowerBound.name + " <: " + upperBound.name + ")"
 }
 
 trait LowerBoundedTypeParamConstraint extends TypeParamConstraint {
@@ -506,7 +508,8 @@ trait LowerBoundedTypeParamConstraint extends TypeParamConstraint {
   def lowerBound: TypeEntity
 
   /** toString for debugging */
-  override def toString = typeParamName + " is a superclass of " + lowerBound.name + " (" + typeParamName + " >: " + lowerBound.name + ")"
+  override def toString = typeParamName + " is a superclass of " + lowerBound.name + " (" + typeParamName + " >: " + 
+    lowerBound.name + ")"
 }
 
 trait UpperBoundedTypeParamConstraint extends TypeParamConstraint {
@@ -514,5 +517,6 @@ trait UpperBoundedTypeParamConstraint extends TypeParamConstraint {
   def upperBound: TypeEntity
 
   /** toString for debugging */
-  override def toString = typeParamName + " is a subclass of " + upperBound.name + " (" + typeParamName + " <: " + upperBound.name + ")"
+  override def toString = typeParamName + " is a subclass of " + upperBound.name + " (" + typeParamName + " <: " + 
+    upperBound.name + ")"
 }
