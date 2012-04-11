@@ -131,8 +131,10 @@ $(document).ready(function(){
     });
 
     /* Add toggle arrows */
-    var docAllSigs = $("#template li").has(".fullcomment").find(".signature");
-    
+    //var docAllSigs = $("#template li").has(".fullcomment").find(".signature");
+    // trying to speed things up a little bit
+    var docAllSigs = $("#template li[fullComment=yes] .signature");    
+
     function commentToggleFct(signature){
         var parent = signature.parent();
         var shortComment = $(".shortcomment", parent);

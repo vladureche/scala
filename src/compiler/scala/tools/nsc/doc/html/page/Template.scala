@@ -186,9 +186,9 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
           // implicitly inherited
           NodeSeq fromSeq (for (conversion <- (tpl.conversions)) yield
             <div class="conversion" name={ conversion.conversionQualifiedName }>
-              <h3>Inherited by implicit conversion to {
-                typeToHtml(conversion.targetType, true)
-              }</h3>
+              <h3>Inherited by implicit conversion { conversion.conversionShortName } from 
+                { typeToHtml(tpl.resultType, true) } to { typeToHtml(conversion.targetType, true) }
+              </h3>
             </div>
           )
         }
@@ -242,11 +242,12 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
       case d:MemberEntity with Def => defParamsToString(d)
       case _ => ""
     }
+    val memberComment = memberToCommentHtml(mbr, false)
     <li name={ mbr.definitionName } visbl={ if (mbr.visibility.isProtected) "prt" else "pub" }
-      data-isabs={ mbr.isAbstract.toString }>
+      data-isabs={ mbr.isAbstract.toString } fullComment={ if(memberComment.isEmpty) "no" else "yes" }>
       <a id={ mbr.name +defParamsString +":"+ mbr.resultType.name}/>
       { signature(mbr, false) }
-      { memberToCommentHtml(mbr, false) }
+      { memberComment }
     </li>
   }
 

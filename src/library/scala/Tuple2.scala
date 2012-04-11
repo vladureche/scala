@@ -62,6 +62,7 @@ case class Tuple2[@specialized(Int, Long, Double, Char, Boolean, AnyRef) +T1, @s
    *  @define mayNotTerminateInf
    *  @define willNotTerminateInf
    *  @define collectExample
+   *  @define undefinedorder
    */
   class Zipped[+Repr1, +El1, +Repr2, +El2](coll1: TLike[El1, Repr1], coll2: ILike[El2, Repr2]) { // coll2: ILike for filter
     def map[B, To](f: (El1, El2) => B)(implicit cbf: CBF[Repr1, B, To]): To = {

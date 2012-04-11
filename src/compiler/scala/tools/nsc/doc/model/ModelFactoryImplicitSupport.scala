@@ -165,6 +165,11 @@ trait ModelFactoryImplicitSupport {
       var conversions = results.flatMap(result => makeImplicitConversion(sym, result._1, result._2, context, inTpl))
       conversions = conversions.filterNot(_.members.isEmpty)
       
+      // Filter out specialized conversions from array
+      if (sym == ArrayClass)
+        conversions = conversions.filterNot((conv: ImplicitConversion) => 
+          hardcoded.arraySkipConversions.contains(conv.conversionQualifiedName))
+      
       // Put the class-specific conversions in front
       val (ownConversions, commonConversions) = 
         conversions.partition(conv => !hardcoded.commonConversionTargets.contains(conv.conversionQualifiedName))
@@ -474,4 +479,28 @@ object hardcoded {
     ("<root>.scala.reflect.Manifest"      -> ((tparam: String) => tparam + " is accompanied by a Manifest, which is a runtime representation of its type that survives erasure")) + 
     ("<root>.scala.reflect.ClassManifest" -> ((tparam: String) => tparam + " is accompanied by a ClassManifest, which is a runtime representation of its type that survives erasure")) + 
     ("<root>.scala.reflect.OptManifest"   -> ((tparam: String) => tparam + " is accompanied by an OptManifest, which can be either a runtime representation of its type or the NoManifest, which means the runtime type is not available"))
+
+  /** There's a reason all these are specialized by hand but documenting each of them is beyond the point */
+  val arraySkipConversions = List(
+    "scala.Predef.refArrayOps",
+    "scala.Predef.intArrayOps",
+    "scala.Predef.doubleArrayOps",
+    "scala.Predef.longArrayOps",
+    "scala.Predef.floatArrayOps",
+    "scala.Predef.charArrayOps",
+    "scala.Predef.byteArrayOps",
+    "scala.Predef.shortArrayOps",
+    "scala.Predef.booleanArrayOps",
+    "scala.Predef.unitArrayOps",
+    "scala.LowPriorityImplicits.wrapRefArray",
+    "scala.LowPriorityImplicits.wrapIntArray",
+    "scala.LowPriorityImplicits.wrapDoubleArray",
+    "scala.LowPriorityImplicits.wrapLongArray",
+    "scala.LowPriorityImplicits.wrapFloatArray",
+    "scala.LowPriorityImplicits.wrapCharArray",
+    "scala.LowPriorityImplicits.wrapByteArray",
+    "scala.LowPriorityImplicits.wrapShortArray",
+    "scala.LowPriorityImplicits.wrapBooleanArray",
+    "scala.LowPriorityImplicits.wrapUnitArray",
+    "scala.LowPriorityImplicits.genericWrapArray")
 }
