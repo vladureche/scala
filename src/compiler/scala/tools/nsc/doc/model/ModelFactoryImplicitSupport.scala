@@ -60,23 +60,25 @@ trait ModelFactoryImplicitSupport {
   import global.definitions._
   
   // debugging:
-  val DEBUG: Boolean = System.getProperty("scaladoc.implicits.debug", "false") == "true"
-  val ERROR: Boolean = System.getProperty("scaladoc.implicits.error", "false") == "true" || DEBUG
+  val DEBUG: Boolean = settings.docImplicitsDebug.value
+  val ERROR: Boolean = true // currently we show all errors
   @inline final def debug(msg: => String) = if (DEBUG) println(msg)
   @inline final def error(msg: => String) = if (ERROR) println(msg)
   
-  /** This is a flag that indicates whether to resolve static implicits. For example, if an implicit conversion requires
-   *  that there is a Numeric[T] in scope:
+  /** This is a flag that indicates whether to eliminate implicits that cannot be satisfied within the current scope. 
+   * For example, if an implicit conversion requires that there is a Numeric[T] in scope:
    *  {{{
    *     class A[T]
    *     class B extends A[Int]
    *     class C extends A[String]
    *     implicit def pimpA[T: Numeric](a: A[T]): D
    *  }}}
-   *  If the flag is set, no constraints are generated for the conversion from B to D and the conversion from C to D
-   *  is not generated at all, since there's no such implicit in scope
+   *  For B, no constraints are generated as Numeric[Int] is already in the default scope. On the other hand, for the 
+   *  conversion from C to D, depending on -implicits-show-all, the conversion can:
+   *   - not be generated at all, since there's no Numeric[String] in scope (if ran without -implicits-show-all)
+   *   - generated with a *weird* constraint, Numeric[String] as the user might add it by hand (if flag is enabled)
    */
-  val eliminateImplicits: Boolean = System.getProperty("scaladoc.implicits.eliminate", "true") == "true"
+  val implicitsShowAll: Boolean = settings.docImplicitsShowAll.value
   class ImplicitNotFound(tpe: Type) extends Exception("No implicit of type " + tpe + " found in scope.")
 
   /* ============== IMPLEMENTATION PROVIDING ENTITY TYPES ============== */  
@@ -116,6 +118,8 @@ trait ModelFactoryImplicitSupport {
       else
         Right(convSym.nameString)
     }
+
+    def conversionShortName = convSym.nameString
 
     def conversionQualifiedName = convertorOwner.qualifiedName + "." + convSym.nameString
     
@@ -256,7 +260,7 @@ trait ModelFactoryImplicitSupport {
       var available: Option[Boolean] = None
 
       // look for type variables in the type. If there are none, we can decide if the implicit is there or not
-      if (eliminateImplicits && typeVarsInType(tpe).isEmpty) {
+      if (typeVarsInType(tpe).isEmpty) {
         try {
           context.flushBuffer() /* any errors here should not prevent future findings */
           val search = inferImplicit(EmptyTree, tpe, false, false, context, false)
@@ -270,7 +274,8 @@ trait ModelFactoryImplicitSupport {
       available match {
         case Some(true) => 
           Nil
-        case Some(false) => 
+        case Some(false) if (!implicitsShowAll) => 
+          // if -implicits-show-all is not set, we get rid of impossible conversions (such as Numeric[String])
           throw new ImplicitNotFound(implType)
         case None =>
           val typeParamNames = sym.typeParams.map(_.name)

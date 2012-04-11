@@ -69,13 +69,13 @@ $(document).ready(function(){
         filter();
     });
 
-    $("#ancestors > ol > li.hideall").click(function() {
+    $("#mbrsel > div[id=ancestors] > ol > li.hideall").click(function() {
         $("#linearization li.in").removeClass("in").addClass("out");
         $("#linearization li:first").removeClass("out").addClass("in");
         $("#implicits li.in").removeClass("in").addClass("out");
         filter();
     })
-    $("#ancestors > ol > li.showall").click(function() {
+    $("#mbrsel > div[id=ancestors] > ol > li.showall").click(function() {
         var filteredLinearization =
             $("#linearization li.out").filter(function() {
                 return ! isHiddenClass($(this).attr("name"));
@@ -179,14 +179,14 @@ $(document).ready(function(){
 function orderAlpha() {
     $("#template > div.parent").hide();
     $("#template > div.conversion").hide();
-    $("#ancestors").show();
+    $("#mbrsel > div[id=ancestors]").show();
     filter();
 };
 
 function orderInherit() {
     $("#template > div.parent").show();
     $("#template > div.conversion").show();
-    $("#ancestors").hide();
+    $("#mbrsel > div[id=ancestors]").hide();
     filter();
 };
 

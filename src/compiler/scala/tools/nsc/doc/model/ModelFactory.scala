@@ -255,7 +255,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     }
     def subClasses = if (subClassesCache == null) Nil else subClassesCache.toList
 
-    val conversions = makeImplicitConversions(sym, this)
+    val conversions = if (settings.docImplicits.value) makeImplicitConversions(sym, this) else Nil
 
     lazy val memberSyms =
        // Only this class's constructors are part of its members, inherited constructors are not.

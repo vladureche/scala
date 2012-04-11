@@ -95,26 +95,35 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
             </div>
         }
         { if (tpl.linearizationTemplates.isEmpty && tpl.conversions.isEmpty) NodeSeq.Empty else
-            <div id="ancestors">
-              <span class="filtertype">Inherited<br/><a href="http://docs.scala-lang.org" target="_blank">Learn more</a></span>
-              <ol>
-                <li class="hideall out"><span>Hide All</span></li>
-                <li class="showall in"><span>Show all</span></li>
-              </ol>
-              { 
-                if (!tpl.linearization.isEmpty)
-                  <ol id="linearization">
-                    { (tpl :: tpl.linearizationTemplates).map(wte => <li class="in" name={ wte.qualifiedName }><span>{ wte.name }</span></li>) }
-                  </ol>
-                else NodeSeq.Empty 
-              } { 
-                if (!tpl.conversions.isEmpty)
-                  <ol id="implicits">
-                    { tpl.conversions.map(conv => <li class="in" name={ conv.conversionQualifiedName }><span>{ conv.targetType.name }</span></li>) }
-                  </ol>
-                else NodeSeq.Empty 
-              }
-            </div>
+          { 
+            if (!tpl.linearization.isEmpty)
+              <div id="ancestors">
+                <span class="filtertype">Inherited<br/>
+                </span>
+                <ol id="linearization">
+                  { (tpl :: tpl.linearizationTemplates).map(wte => <li class="in" name={ wte.qualifiedName }><span>{ wte.name }</span></li>) }
+                </ol>
+              </div>
+            else NodeSeq.Empty 
+          } ++ { 
+            if (!tpl.conversions.isEmpty)
+              <div id="ancestors">
+                <span class="filtertype">Implicitly<br/>
+                </span>
+                <ol id="implicits">
+                  { tpl.conversions.map(conv => <li class="in" name={ conv.conversionQualifiedName }><span>{ "by " + conv.conversionShortName }</span></li>) }
+                </ol>
+              </div>
+            else NodeSeq.Empty 
+          } ++
+          <div id="ancestors">
+            <span class="filtertype"></span>
+            <ol>
+              <li class="hideall out"><span>Hide All</span></li>
+              <li class="showall in"><span>Show all</span></li>
+            </ol>
+          </div>
+          // <a href="http://docs.scala-lang.org" target="_blank">Learn more</a></span>
         }
         {
           <div id="visbl">
@@ -343,8 +352,7 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
 
     val implicitInformation = mbr.byConversion match {
       case Some(conv) =>
-        <dt class="implicit">Implicit information</dt> 
-        <dd>
+        <dt class="implicit">Implicit information</dt> ++ 
         {
           val targetType = typeToHtml(conv.targetType, true)
           val conversionMethod = conv.convertorMethod match {
@@ -352,6 +360,7 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
             case Right(name)  => Text(name)
           }
           val conversionOwnerName = conv.convertorOwner.qualifiedName
+          val conversionOwner = templateToHtml(conv.convertorOwner, conversionOwnerName)
 
           val constraintText = conv.constraints match {
             case Nil =>
@@ -368,11 +377,12 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
                 </ul>
           }
 
-          xml.Text("This member is added by an implicit conversion to ") ++ targetType ++ " performed by method " ++ 
-            conversionMethod ++ " in " ++ templateToHtml(conv.convertorOwner, conversionOwnerName) ++ "." ++
-            constraintText
+          <dd>
+            This member is added by an implicit conversion from { typeToHtml(mbr.inTemplate.resultType, true) } to 
+            { targetType } performed by method { conversionMethod } in { conversionOwner }. 
+            { constraintText }
+          </dd>
         }
-        </dd>
       case _ =>
         NodeSeq.Empty
     }

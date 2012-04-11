@@ -430,6 +430,9 @@ trait ImplicitConversion {
   /** The entity for the method that performed the conversion, if it's documented (or just its name, otherwise) */
   def convertorMethod: Either[MemberEntity, String]
 
+  /** A short name of the convertion */
+  def conversionShortName: String
+
   /** A qualified name uniquely identifying the convertion (currently: the conversion method's qualified name) */
   def conversionQualifiedName: String 
 
