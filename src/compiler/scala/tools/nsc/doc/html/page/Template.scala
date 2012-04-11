@@ -852,7 +852,7 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
         context-bounded</a> ++ xml.Text(" by " + tcc.typeClassEntity.qualifiedName + " (" + tcc.typeParamName + ": ") ++ 
         templateToHtml(tcc.typeClassEntity) ++ xml.Text(")")
     case impl: ImplicitInScopeConstraint =>
-      xml.Text("an implicit _: ") ++ typeToHtml(impl.implicitType, true) ++ xml.Text(" must be in scope")
+      xml.Text("an implicit value of type ") ++ typeToHtml(impl.implicitType, true) ++ xml.Text(" is in scope")
     case eq: EqualTypeParamConstraint =>
       xml.Text(eq.typeParamName + " is " + eq.rhs.name + " (" + eq.typeParamName + " =:= ") ++ 
         typeToHtml(eq.rhs, true) ++ xml.Text(")")

@@ -127,11 +127,18 @@ trait ModelFactoryImplicitSupport {
     
     val members: List[MemberEntity] = {
       // Obtain the members inherited by the implicit conversion
-      val memberSyms = toType.members.filter(implicitShouldDocument(_))
-      
+      var memberSyms = toType.members.filter(implicitShouldDocument(_))
+      val existingMembers = sym.info.members
+
       // Debugging part :)
       debug(sym.nameString + "\n" + "=" * sym.nameString.length())
       debug(" * conversion " + convSym + " from " + sym.tpe + " to " + toType)
+
+      // Members inherited by implicit conversions cannot override actual members
+      memberSyms = memberSyms.filterNot((sym1: Symbol) => 
+        existingMembers.exists(sym2 => sym1.name == sym2.name && 
+          isSameType(toType.memberInfo(sym1), sym.info.memberInfo(sym2))))
+
       debug("   -> full type: " + toType)
       if (constraints.length != 0) {
         debug("   -> constraints: ")      
@@ -169,6 +176,10 @@ trait ModelFactoryImplicitSupport {
       if (sym == ArrayClass)
         conversions = conversions.filterNot((conv: ImplicitConversion) => 
           hardcoded.arraySkipConversions.contains(conv.conversionQualifiedName))
+
+      // Filter out non-sensical conversions from value types
+      if (isScalaValueType(sym.tpe))
+        conversions = conversions.filter(hardcoded.valueClassFilter(sym.nameString, _))
       
       // Put the class-specific conversions in front
       val (ownConversions, commonConversions) = 
@@ -462,11 +473,14 @@ trait ModelFactoryImplicitSupport {
     // - members starting with _ (usually reserved for internal stuff)
     localShouldDocument(aSym) && (!aSym.isConstructor) && (aSym.owner != ObjectClass) && 
     (aSym.owner != AnyClass) && (aSym.owner != AnyRefClass) && 
-    (!aSym.isProtected) && (!aSym.isPrivate) && (!aSym.name.toString.startsWith("_"))
+    (!aSym.isProtected) && (!aSym.isPrivate) && (!aSym.name.startsWith("_")) && 
+    (aSym.isMethod || aSym.isGetter || aSym.isSetter) &&
+    (aSym.nameString != "getClass")
   }
 }
 
 object hardcoded {
+
   /** Common conversion targets that affect any class in Scala */
   val commonConversionTargets = 
     List("scala.Predef.any2stringfmt", "scala.Predef.any2stringadd", "scala.Predef.any2ArrowAssoc", "scala.Predef.any2Ensuring")
@@ -503,4 +517,24 @@ object hardcoded {
     "scala.LowPriorityImplicits.wrapBooleanArray",
     "scala.LowPriorityImplicits.wrapUnitArray",
     "scala.LowPriorityImplicits.genericWrapArray")
+
+  def valueClassList = List("unit", "boolean", "byte", "short", "char", "int", "long", "float", "double")
+  def valueClassFilterPrefixes = List("scala.LowPriorityImplicits", "scala.Predef")
+
+  /** Dirty, dirty, dirty hack: the value params conversions can all kick in -- and they are disambiguated by priority
+   *  but showing priority in scaladoc would make no sense -- so we have to manually remove the conversions that we
+   *  know will never get a chance to kick in. Anyway, DIRTY DIRTY DIRTY! */
+  def valueClassFilter(value: String, ic: ImplicitConversion): Boolean = {
+    var allowed = true
+    val valueName = value.toLowerCase
+    val otherValues = valueClassList.filterNot(_ == valueName)
+    val conversionName = ic.conversionQualifiedName
+
+    for (prefix <- valueClassFilterPrefixes)
+      if (conversionName.startsWith(prefix))
+        for (otherValue <- otherValues)
+          allowed &&= !conversionName.startsWith(prefix + "." + otherValue)
+
+    allowed
+  }
 }
