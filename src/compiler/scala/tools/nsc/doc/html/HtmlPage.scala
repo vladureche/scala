@@ -169,10 +169,10 @@ abstract class HtmlPage extends Page { thisPage =>
       if (hasPage(dTpl)) {
         <a href={ relativeLinkTo(dTpl) } class="extype" name={ dTpl.qualifiedName }>{ if (name eq null) dTpl.name else name }</a>
       } else {
-        xml.Text(dTpl.name)
+        xml.Text(if (name eq null) dTpl.name else name)
       }
     case ndTpl: NoDocTemplate =>
-      xml.Text(ndTpl.name)
+      xml.Text(if (name eq null) ndTpl.name else name)
   }
 
   /** Returns the HTML code that represents the templates in `tpls` as a list of hyperlinked names. */

@@ -96,8 +96,8 @@ trait ModelFactoryImplicitSupport {
     def targetType: TypeEntity = makeType(toType, inTpl)
     
     def convertorOwner: TemplateEntity = 
-      if (convSym != NoSymbol) 
-        makeTemplate(convSym.owner) 
+      if (convSym != NoSymbol)
+        makeTemplate(convSym.owner)
       else {
         error("Implicit conversion from " + sym.tpe + " to " + toType + " done by " + convSym + " = NoSymbol!")
         makeRootPackage.get // surely the root package was created :)
@@ -210,10 +210,14 @@ trait ModelFactoryImplicitSupport {
       
       // TODO: Isolate this corner case :) - Predef.<%< and put it in the testsuite
       if (viewSimplifiedType.params.length != 1) {
-        error("incorrect number of parameters: " + viewSimplifiedType.params.length)
-        error("  type: " + viewSimplifiedType)
-        error("  while transforming sym: " + sym)
-        error("  with tree: " + result.tree)
+        // This is known to be caused by the `<%<` object in Predef:
+        // {{{
+        //    sealed abstract class <%<[-From, +To] extends (From => To) with Serializable
+        //    object <%< {
+        //      implicit def conformsOrViewsAs[A <% B, B]: A <%< B = new (A <%< B) {def apply(x: A) = x}
+        //    }
+        // }}}
+        // so we just won't generate an implicit conversion for implicit methods that only take implicit parameters
         return Nil
       }
 

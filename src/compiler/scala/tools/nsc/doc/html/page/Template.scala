@@ -359,8 +359,10 @@ class Template(universe: doc.Universe, tpl: DocTemplateEntity) extends HtmlPage 
             case Left(member) => Text(member.name)
             case Right(name)  => Text(name)
           }
-          val conversionOwnerName = conv.convertorOwner.qualifiedName
-          val conversionOwner = templateToHtml(conv.convertorOwner, conversionOwnerName)
+
+          // strip off the package object endings, they make things harder to follow
+          val conversionOwnerQualifiedNane = conv.convertorOwner.qualifiedName.stripSuffix(".package") 
+          val conversionOwner = templateToHtml(conv.convertorOwner, conversionOwnerQualifiedNane)
 
           val constraintText = conv.constraints match {
             case Nil =>
