@@ -58,6 +58,7 @@ trait ModelFactoryImplicitSupport {
   import global._
   import global.analyzer._
   import global.definitions._
+  import settings.hardcoded
   
   // debugging:
   val DEBUG: Boolean = settings.docImplicitsDebug.value
@@ -166,9 +167,9 @@ trait ModelFactoryImplicitSupport {
     // But we don't want that, so we'll simply refuse to find implicit conversions on for Nothing and Null
     if (!(sym.isClass || sym.isTrait) || sym == NothingClass || sym == NullClass) Nil
     else {
-      val context: global.analyzer.Context = global.analyzer.rootContext(NoCompilationUnit)            
-      val results = global.analyzer.allViewsFrom(sym.tpe, context, sym.typeParams)
+      var context: global.analyzer.Context = global.analyzer.rootContext(NoCompilationUnit)
 
+      val results = global.analyzer.allViewsFrom(sym.tpe, context, sym.typeParams)
       var conversions = results.flatMap(result => makeImplicitConversion(sym, result._1, result._2, context, inTpl))
       conversions = conversions.filterNot(_.members.isEmpty)
       
@@ -179,7 +180,8 @@ trait ModelFactoryImplicitSupport {
 
       // Filter out non-sensical conversions from value types
       if (isScalaValueType(sym.tpe))
-        conversions = conversions.filter(hardcoded.valueClassFilter(sym.nameString, _))
+        conversions = conversions.filter((ic: ImplicitConversion) => 
+          hardcoded.valueClassFilter(sym.nameString, ic.conversionQualifiedName))
       
       // Put the class-specific conversions in front
       val (ownConversions, commonConversions) = 
@@ -281,6 +283,22 @@ trait ModelFactoryImplicitSupport {
       
       var available: Option[Boolean] = None
 
+      // see: https://groups.google.com/forum/?hl=en&fromgroups#!topic/scala-internals/gm_fr0RKzC4
+      //
+      // println(implType + " => " + implType.isTrivial)
+      // var tpes: List[Type] = List(implType)
+      // while (!tpes.isEmpty) {
+      //   val tpe = tpes.head 
+      //   tpes = tpes.tail
+      //   tpe match {
+      //     case TypeRef(pre, sym, args) =>
+      //       tpes = pre :: args ::: tpes
+      //       println(tpe + " => " + tpe.isTrivial)
+      //     case _ =>
+      //       println(tpe + " (of type" + tpe.getClass + ") => " + tpe.isTrivial)
+      //   }
+      // }
+      // println("\n")
 
       // look for type variables in the type. If there are none, we can decide if the implicit is there or not
       if (implType.isTrivial) {
@@ -476,65 +494,5 @@ trait ModelFactoryImplicitSupport {
     (!aSym.isProtected) && (!aSym.isPrivate) && (!aSym.name.startsWith("_")) && 
     (aSym.isMethod || aSym.isGetter || aSym.isSetter) &&
     (aSym.nameString != "getClass")
-  }
-}
-
-object hardcoded {
-
-  /** Common conversion targets that affect any class in Scala */
-  val commonConversionTargets = 
-    List("scala.Predef.any2stringfmt", "scala.Predef.any2stringadd", "scala.Predef.any2ArrowAssoc", "scala.Predef.any2Ensuring")
-
-  /** The common conversions and the text */
-  val knownTypeClasses: Map[String, String => String] = Map() +
-    ("<root>.scala.package.Numeric"       -> ((tparam: String) => tparam + " is a numeric class, such as Int, Long, Float or Double")) +
-    ("<root>.scala.package.Integral"      -> ((tparam: String) => tparam + " is an integral numeric class, such as Int or Long")) +
-    ("<root>.scala.package.Fractional"    -> ((tparam: String) => tparam + " is a fractional numeric class, such as Float or Double")) +
-    ("<root>.scala.reflect.Manifest"      -> ((tparam: String) => tparam + " is accompanied by a Manifest, which is a runtime representation of its type that survives erasure")) + 
-    ("<root>.scala.reflect.ClassManifest" -> ((tparam: String) => tparam + " is accompanied by a ClassManifest, which is a runtime representation of its type that survives erasure")) + 
-    ("<root>.scala.reflect.OptManifest"   -> ((tparam: String) => tparam + " is accompanied by an OptManifest, which can be either a runtime representation of its type or the NoManifest, which means the runtime type is not available"))
-
-  /** There's a reason all these are specialized by hand but documenting each of them is beyond the point */
-  val arraySkipConversions = List(
-    "scala.Predef.refArrayOps",
-    "scala.Predef.intArrayOps",
-    "scala.Predef.doubleArrayOps",
-    "scala.Predef.longArrayOps",
-    "scala.Predef.floatArrayOps",
-    "scala.Predef.charArrayOps",
-    "scala.Predef.byteArrayOps",
-    "scala.Predef.shortArrayOps",
-    "scala.Predef.booleanArrayOps",
-    "scala.Predef.unitArrayOps",
-    "scala.LowPriorityImplicits.wrapRefArray",
-    "scala.LowPriorityImplicits.wrapIntArray",
-    "scala.LowPriorityImplicits.wrapDoubleArray",
-    "scala.LowPriorityImplicits.wrapLongArray",
-    "scala.LowPriorityImplicits.wrapFloatArray",
-    "scala.LowPriorityImplicits.wrapCharArray",
-    "scala.LowPriorityImplicits.wrapByteArray",
-    "scala.LowPriorityImplicits.wrapShortArray",
-    "scala.LowPriorityImplicits.wrapBooleanArray",
-    "scala.LowPriorityImplicits.wrapUnitArray",
-    "scala.LowPriorityImplicits.genericWrapArray")
-
-  def valueClassList = List("unit", "boolean", "byte", "short", "char", "int", "long", "float", "double")
-  def valueClassFilterPrefixes = List("scala.LowPriorityImplicits", "scala.Predef")
-
-  /** Dirty, dirty, dirty hack: the value params conversions can all kick in -- and they are disambiguated by priority
-   *  but showing priority in scaladoc would make no sense -- so we have to manually remove the conversions that we
-   *  know will never get a chance to kick in. Anyway, DIRTY DIRTY DIRTY! */
-  def valueClassFilter(value: String, ic: ImplicitConversion): Boolean = {
-    var allowed = true
-    val valueName = value.toLowerCase
-    val otherValues = valueClassList.filterNot(_ == valueName)
-    val conversionName = ic.conversionQualifiedName
-
-    for (prefix <- valueClassFilterPrefixes)
-      if (conversionName.startsWith(prefix))
-        for (otherValue <- otherValues)
-          allowed &&= !conversionName.startsWith(prefix + "." + otherValue)
-
-    allowed
   }
 }

@@ -3,7 +3,7 @@ import scala.tools.partest.ScaladocModelTest
 
 object Test extends ScaladocModelTest {  
 
-  def code = """
+  override def code = """
         import scala.annotation.bridge
 
         package scala.test {

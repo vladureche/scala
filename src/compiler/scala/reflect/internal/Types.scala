@@ -1217,7 +1217,7 @@ trait Types extends api.Types { self: SymbolTable =>
   abstract case class ThisType(sym: Symbol) extends SingletonType {
     assert(sym.isClass)
     //assert(sym.isClass && !sym.isModuleClass || sym.isRoot, sym)
-    override def isTrivial: Boolean = sym.isPackageClass
+    override def isTrivial: Boolean = sym.isPackageClass || sym.isModuleClass
     override def isNotNull = true
     override def typeSymbol = sym
     override def underlying: Type = sym.typeOfThis
