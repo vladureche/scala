@@ -516,20 +516,20 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
           override def isVal = true
           override def useCaseOf = _useCaseOf
         })
-      else if (bSym.isAbstractType&& (implConv == null))
+      else if (bSym.isAbstractType)
         Some(new NonTemplateMemberImpl(bSym, implConv, inTpl) with TypeBoundsImpl with HigherKindedImpl with AbstractType {
           override def isAbstractType = true
           override def useCaseOf = _useCaseOf
         })
-      else if (bSym.isAliasType && (implConv == null))
+      else if (bSym.isAliasType && bSym != AnyRefClass)
         Some(new NonTemplateMemberImpl(bSym, implConv, inTpl) with HigherKindedImpl with AliasType {
           override def isAliasType = true
           def alias = makeTypeInTemplateContext(sym.tpe.dealias, inTpl, sym)
           override def useCaseOf = _useCaseOf
         })
-      else if (bSym.isPackage && (implConv == null))
+      else if (bSym.isPackage)
         inTpl match { case inPkg: PackageImpl =>  makePackage(bSym, inPkg) }
-      else if ((bSym.isClass || bSym.isModule) && templateShouldDocument(bSym) && (implConv == null))
+      else if ((bSym.isClass || bSym.isModule || bSym == AnyRefClass) && templateShouldDocument(bSym))
         Some(makeDocTemplate(bSym, inTpl))
       else
         None
