@@ -2,14 +2,15 @@
  *  Testing scaladoc implicits chaining
  */
 package scala.test.scaladoc.implicits {
-  object chaining {
+  
+  // the classes involved
+  case class Z[U](a: U)
+  case class Intermediate[T, U](t: T, u: U)
+  class Implicit1[T](b: Implicit2[T])
+  class Implicit2[T](c: Implicit3[T])
+  class Implicit3[T](/* and so on */)
 
-    // the classes involved
-    case class Z[U](a: U)
-    case class Intermediate[T, U](t: T, u: U)
-    class Implicit1[T](b: Implicit2[T])
-    class Implicit2[T](c: Implicit3[T])
-    class Implicit3[T](/* and so on */)
+  object chaining {
 
     // the base conversion
     implicit def convertToZ[T](a: A[T])(implicit b: Implicit1[T]): Z[A[T]] = Z(a)
@@ -26,7 +27,7 @@ package scala.test.scaladoc.implicits {
 
     // and our targets
     /** conversion here, with constraints */
-    case class A[T]()
+    class A[T]()
     /** conversion here, no constraints */
     class B extends A[Intermediate[String, Int]]
     /** no conversion */
@@ -37,5 +38,11 @@ package scala.test.scaladoc.implicits {
     class E extends A[Intermediate[Double, String]]
     /** no conversion */
     class F extends A[Intermediate[String, Double]]
+
+    object scalacTest {
+      (new B).a
+      (new D).a
+      (new E).a
+    }
   }
 }
