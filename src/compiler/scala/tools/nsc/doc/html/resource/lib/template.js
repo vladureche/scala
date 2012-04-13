@@ -11,7 +11,7 @@ $(document).ready(function(){
                name == 'scala.Predef.any2Ensuring'
     };
 
-    $("#linearization li").filter(function(){
+    $("#linearization li:gt(0)").filter(function(){
         return isHiddenClass($(this).attr("name"));
     }).removeClass("in").addClass("out");
 

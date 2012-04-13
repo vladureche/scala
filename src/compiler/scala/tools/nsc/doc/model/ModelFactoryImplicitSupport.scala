@@ -165,7 +165,7 @@ trait ModelFactoryImplicitSupport {
   def makeImplicitConversions(sym: Symbol, inTpl: => DocTemplateImpl): List[ImplicitConversion] =
     // Nothing and Null are somewhat special -- they can be transformed by any implicit conversion available in scope. 
     // But we don't want that, so we'll simply refuse to find implicit conversions on for Nothing and Null
-    if (!(sym.isClass || sym.isTrait) || sym == NothingClass || sym == NullClass) Nil
+    if (!(sym.isClass || sym.isTrait || sym == AnyRefClass) || sym == NothingClass || sym == NullClass) Nil
     else {
       var context: global.analyzer.Context = global.analyzer.rootContext(NoCompilationUnit)
 
