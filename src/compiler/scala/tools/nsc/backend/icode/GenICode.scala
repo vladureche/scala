@@ -45,6 +45,13 @@ abstract class GenICode extends SubComponent  {
       assert(cond, msg)
   }
 
+  // also necessary in tailcalls
+  def isTrivial(kv: (Tree, Symbol)) = kv match {
+    case (This(_), p) if p.name == nme.THIS     => true
+    case (arg @ Ident(_), p) if arg.symbol == p => true
+    case _                                      => false
+  }
+
   class ICodePhase(prev: Phase) extends StdPhase(prev) {
 
     override def description = "Generate ICode from the AST"
@@ -125,7 +132,7 @@ abstract class GenICode extends SubComponent  {
             // in companion object accessors to @static fields, we access the static field directly
             val hostClass = m.symbol.owner.companionClass
             val staticfield = hostClass.info.findMember(m.symbol.accessed.name, NoFlags, NoFlags, false)
-            
+
             if (m.symbol.isGetter) {
               ctx1.bb.emit(LOAD_FIELD(staticfield, true) setHostClass hostClass, tree.pos)
               ctx1.bb.closeWith(RETURN(m.returnType))
@@ -195,8 +202,12 @@ abstract class GenICode extends SubComponent  {
 
       case Assign(lhs, rhs) =>
         val ctx1 = genLoad(rhs, ctx, toTypeKind(lhs.symbol.info))
-        val Some(l) = ctx.method.lookupLocal(lhs.symbol)
-        ctx1.bb.emit(STORE_LOCAL(l), tree.pos)
+        if (lhs.symbol.name == nme.THIS)
+          ctx1.bb.emit(STORE_THIS(toTypeKind(ctx1.clazz.symbol.tpe)))
+        else {
+          val Some(l) = ctx.method.lookupLocal(lhs.symbol)
+          ctx1.bb.emit(STORE_LOCAL(l), tree.pos)
+        }
         ctx1
 
       case _ =>
@@ -879,7 +890,7 @@ abstract class GenICode extends SubComponent  {
           ctx1
 
         case app @ Apply(fun @ Select(qual, _), args)
-        if !ctx.method.symbol.isStaticConstructor 
+        if !ctx.method.symbol.isStaticConstructor
         && fun.symbol.isAccessor && fun.symbol.accessed.hasStaticAnnotation =>
           // bypass the accessor to the companion object and load the static field directly
           // the only place were this bypass is not done, is the static intializer for the static field itself
@@ -887,7 +898,7 @@ abstract class GenICode extends SubComponent  {
           generatedType = toTypeKind(sym.accessed.info)
           val hostClass = qual.tpe.typeSymbol.orElse(sym.owner).companionClass
           val staticfield = hostClass.info.findMember(sym.accessed.name, NoFlags, NoFlags, false)
-          
+
           if (sym.isGetter) {
             ctx.bb.emit(LOAD_FIELD(staticfield, true) setHostClass hostClass, tree.pos)
             ctx
@@ -900,10 +911,10 @@ abstract class GenICode extends SubComponent  {
             assert(false, "supposedly unreachable")
             ctx
           }
-        
+
         case app @ Apply(fun, args) =>
           val sym = fun.symbol
-          
+
           if (sym.isLabel) {  // jump to a label
             val label = ctx.labels.getOrElse(sym, {
               // it is a forward jump, scan for labels
@@ -1036,8 +1047,9 @@ abstract class GenICode extends SubComponent  {
             if (sym.isModule) {
               genLoadModule(ctx, tree)
               generatedType = toTypeKind(sym.info)
-            }
-            else {
+            } else if (sym.name == nme.SELF) {
+              ctx.bb.emit(THIS(ctx.clazz.symbol), tree.pos)
+            } else {
               try {
                 val Some(l) = ctx.method.lookupLocal(sym)
                 ctx.bb.emit(LOAD_LOCAL(l), tree.pos)
@@ -1220,12 +1232,6 @@ abstract class GenICode extends SubComponent  {
         "Wrong number of arguments in call to label " + label.symbol
       )
       var ctx1 = ctx
-
-      def isTrivial(kv: (Tree, Symbol)) = kv match {
-        case (This(_), p) if p.name == nme.THIS     => true
-        case (arg @ Ident(_), p) if arg.symbol == p => true
-        case _                                      => false
-      }
 
       val stores = args zip label.params filterNot isTrivial map {
         case (arg, param) =>
