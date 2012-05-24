@@ -285,6 +285,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
        extends MemberDef with TypeDefApi
   object TypeDef extends TypeDefExtractor
 
+  /** NOTE: LabelDefs into which the control flow can go into must not have parameters */
   case class LabelDef(name: TermName, params: List[Ident], rhs: Tree)
        extends DefTree with TermTree with LabelDefApi
   object LabelDef extends LabelDefExtractor
