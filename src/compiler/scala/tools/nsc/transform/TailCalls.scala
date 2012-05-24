@@ -8,6 +8,7 @@ package transform
 
 import symtab.Flags
 import Flags.SYNTHETIC
+import Flags.MUTABLE
 
 /** Perform tail recursive call elimination.
  *
@@ -111,6 +112,15 @@ abstract class TailCalls extends Transform {
       /** The expected type arguments of self-recursive calls */
       var tparams: List[Symbol] = Nil
 
+      /** The this parameter value, replaced in the backend */
+      var thisValue: Symbol = NoSymbol
+
+      /** The this parameter gets replaced by _this */
+      var thisParam: Symbol = NoSymbol
+
+      /** The parameter variables */
+      var params: List[Symbol] = Nil
+
       /** Tells whether we are in a (possible) tail position */
       var tailPos = false
 
@@ -120,27 +130,34 @@ abstract class TailCalls extends Transform {
 
       def this(that: Context) = {
         this()
-        this.method   = that.method
-        this.tparams  = that.tparams
-        this.tailPos  = that.tailPos
-        this.failPos  = that.failPos
-        this.label    = that.label
+        this.method     = that.method
+        this.tparams    = that.tparams
+        this.tailPos    = that.tailPos
+        this.failPos    = that.failPos
+        this.label      = that.label
         this.tailLabels = that.tailLabels
+        this.params     = that.params
+        this.thisParam  = that.thisParam
+        this.thisValue  = that.thisValue
       }
       def this(dd: DefDef) {
         this()
-        this.method   = dd.symbol
-        this.tparams  = dd.tparams map (_.symbol)
-        this.tailPos  = true
-        this.failPos  = dd.pos
+        this.method    = dd.symbol
+        this.tparams   = dd.tparams map (_.symbol)
+        this.tailPos   = true
+        this.failPos   = dd.pos
+        this.thisParam = method.newVariable(newTermName("_this"), dd.pos.makeTransparent, SYNTHETIC) setInfo currentClass.typeOfThis
 
         /** Create a new method symbol for the current method and store it in
           * the label field.
           */
         this.label    = {
-          val label     = method.newLabel(newTermName("_" + method.name), method.pos)
-          val thisParam = method.newSyntheticValueParam(currentClass.typeOfThis)
-          label setInfo MethodType(thisParam :: method.tpe.params, method.tpe.finalResultType)
+          val label      = method.newLabel(newTermName("_" + method.name), method.pos)
+          this.thisValue = method.newSyntheticValueParam(currentClass.typeOfThis)
+          this.params    = method.tpe.params.map(param => method.newVariable(newTermName("_" + param.name.toString), param.pos.makeTransparent).setInfo(param.info).setFlag(SYNTHETIC))
+
+          // The label doesn't take any parameters, so the control flow can go in it
+          label setInfo MethodType(Nil, method.tpe.finalResultType)
         }
         if (isEligible)
           label substInfo (method.tpe.typeParams, tparams)
@@ -153,11 +170,6 @@ abstract class TailCalls extends Transform {
       def isMandatory      = method.hasAnnotation(TailrecClass) && !forMSIL
       def isTransformed    = isEligible && accessed(label)
       def tailrecFailure() = unit.error(failPos, "could not optimize @tailrec annotated " + method + ": " + failReason)
-
-      def newThis(pos: Position) = logResult("Creating new `this` during tailcalls\n  method: %s\n  current class: %s".format(
-        method.ownerChain.mkString(" -> "), currentClass.ownerChain.mkString(" -> "))) {
-          method.newValue(nme.THIS, pos, SYNTHETIC) setInfo currentClass.typeOfThis
-      }
 
       override def toString(): String = (
         "" + method.name + " tparams: " + tparams + " tailPos: " + tailPos +
@@ -220,7 +232,10 @@ abstract class TailCalls extends Transform {
           debuglog("Rewriting tail recursive call:  " + fun.pos.lineContent.trim)
 
           accessed += ctx.label
-          typedPos(fun.pos)(Apply(Ident(ctx.label), recv :: transformArgs))
+          val thisAssign  = Assign(Ident(ctx.thisParam), recv)
+          val paramAssign = for ((param, value) <- ctx.params zip transformArgs) yield Assign(Ident(param), value)
+
+          typedPos(fun.pos)(Block(thisAssign::paramAssign, Apply(Ident(ctx.label), Nil)))
         }
 
         if (!ctx.isEligible)            fail("it is neither private nor final so can be overridden")
@@ -275,13 +290,52 @@ abstract class TailCalls extends Transform {
                   newCtx.tailrecFailure()
                 }
               }
-              val newThis = newCtx.newThis(tree.pos)
+              /*
+               * Here's how we rewrite the code:
+               *
+               * class Foo {
+               *   final def bar(i: Int, other: Foo) = {
+               *     println(i)
+               *     other.bar(i-1, this)
+               *   }
+               * }
+               *
+               * becomes:
+               *
+               * class Foo {
+               *   final def bar(i: Int, other: Foo) = {
+               *     var _this = this
+               *     var _i = i
+               *     var _other = other
+               *     bar(): // a LabelDef
+               *       println(_i)    // notice i became _i
+               *       // this is the translation for other.bar(i-1, this) in done in rewriteApply
+               *       _this = other  // the new receiver is stored in _this
+               *       _i = _i - 1    // the updated parameter i
+               *       _other = this  // the updated parameter other
+               *       bar()          // the tail call itself
+               *   }
+               * }
+               */
               val vpSyms  = vparamss0.flatten map (_.symbol)
 
-              typedPos(tree.pos)(Block(
-                List(ValDef(newThis, This(currentClass))),
-                LabelDef(newCtx.label, newThis :: vpSyms, newRHS)
-              ))
+              // prepare the variables that store the label's parameters
+              assert(newCtx.params.length == vpSyms.length)
+              val thisValDef  = ValDef(newCtx.thisParam, This(currentClass))
+              val paramValDef = for ((param, value) <- newCtx.params zip vpSyms) yield ValDef(param, Ident(value))
+
+              // transform the variables to their _ equivalents
+              val valTransformer = new TreeSymSubstituter(vpSyms, newCtx.params)
+              valTransformer.transform(newRHS)
+
+              // transform this to _this
+              val thisTransformer = new ThisSubstituter(dd.symbol.enclClass, typed(Ident(newCtx.thisParam)))
+              thisTransformer.transform(newRHS)
+
+              val result = typedPos(tree.pos)(
+                Block(thisValDef :: paramValDef, LabelDef(newCtx.label, newCtx.label.info.params, newRHS)))
+
+              result
             }
             else {
               if (newCtx.isMandatory && newRHS.exists(isRecursiveCall))
