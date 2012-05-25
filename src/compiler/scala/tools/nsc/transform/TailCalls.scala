@@ -159,8 +159,8 @@ abstract class TailCalls extends Transform {
           // The label doesn't take any parameters, so the control flow can go in it
           label setInfo MethodType(Nil, method.tpe.finalResultType)
         }
-        if (isEligible)
-          label substInfo (method.tpe.typeParams, tparams)
+        if (isEligible) 
+          (label :: thisParam :: params) map (_.substInfo(method.tpe.typeParams, tparams))
       }
 
       def enclosingType    = method.enclClass.typeOfThis
