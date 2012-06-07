@@ -860,12 +860,14 @@ QUICK BUILD (QUICK)
 
 
   <target name="quick.pre-reflect" depends="quick.lib">
-    <condition property="quick.reflect.needed">
-      <not><available file="${build-quick.dir}/reflect.complete"/></not>
-    </condition>
+    <uptodate property="quick.reflect.available" targetfile="${build-quick.dir}/reflect.complete">
+      <srcfiles dir="${src.dir}">
+        <include name="reflect/**"/>
+      </srcfiles>
+    </uptodate>
   </target>
 
-  <target name="quick.reflect" depends="quick.pre-reflect" if="quick.reflect.needed">
+  <target name="quick.reflect" depends="quick.pre-reflect" unless="quick.reflect.available">
     <stopwatch name="quick.reflect.timer"/>
     <mkdir dir="${build-quick.dir}/classes/reflect"/>
     <scalacfork
