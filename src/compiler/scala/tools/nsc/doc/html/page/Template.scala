@@ -646,13 +646,13 @@ class Template(universe: doc.Universe, generator: DiagramGenerator, tpl: DocTemp
       case PrivateInTemplate(owner) if (owner == mbr.inTemplate) =>
         Some(Paragraph(CText("private")))
       case PrivateInTemplate(owner) =>
-        Some(Paragraph(Chain(List(CText("private["), EntityLink(owner.qualifiedName, () => Some(owner)), CText("]")))))
+        Some(Paragraph(Chain(List(CText("private["), EntityLink(comment.Text(owner.qualifiedName), LinkToTpl(owner)), CText("]")))))
       case ProtectedInInstance() =>
         Some(Paragraph(CText("protected[this]")))
       case ProtectedInTemplate(owner) if (owner == mbr.inTemplate) =>
         Some(Paragraph(CText("protected")))
       case ProtectedInTemplate(owner) =>
-        Some(Paragraph(Chain(List(CText("protected["), EntityLink(owner.qualifiedName, () => Some(owner)), CText("]")))))
+        Some(Paragraph(Chain(List(CText("protected["), EntityLink(comment.Text(owner.qualifiedName), LinkToTpl(owner)), CText("]")))))
       case Public() =>
         None
     }

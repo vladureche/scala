@@ -24,7 +24,8 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
                with ModelFactoryTypeSupport
                with DiagramFactory
                with CommentFactory
-               with TreeFactory =>
+               with TreeFactory
+               with MemberLookup =>
 
   import global._
   import definitions.{ ObjectClass, NothingClass, AnyClass, AnyValClass, AnyRefClass }
@@ -92,6 +93,8 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     def qualifiedName = name
     def annotations = sym.annotations.map(makeAnnotation)
     def inPackageObject: Boolean = sym.owner.isModuleClass && sym.owner.sourceModule.isPackageObject
+    def isType = sym.name.isTypeName
+    def isTerm = sym.name.isTermName
   }
 
   trait TemplateImpl extends EntityImpl with TemplateEntity {
@@ -167,9 +170,9 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     def deprecation =
       if (sym.isDeprecated)
         Some((sym.deprecationMessage, sym.deprecationVersion) match {
-          case (Some(msg), Some(ver)) => parseWiki("''(Since version " + ver + ")'' " + msg, NoPosition)
-          case (Some(msg), None) => parseWiki(msg, NoPosition)
-          case (None, Some(ver)) =>  parseWiki("''(Since version " + ver + ")''", NoPosition)
+          case (Some(msg), Some(ver)) => parseWiki("''(Since version " + ver + ")'' " + msg, NoPosition, Some(inTpl))
+          case (Some(msg), None) => parseWiki(msg, NoPosition, Some(inTpl))
+          case (None, Some(ver)) =>  parseWiki("''(Since version " + ver + ")''", NoPosition, Some(inTpl))
           case (None, None) => Body(Nil)
         })
       else
@@ -177,9 +180,9 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     def migration =
       if(sym.hasMigrationAnnotation)
         Some((sym.migrationMessage, sym.migrationVersion) match {
-          case (Some(msg), Some(ver)) => parseWiki("''(Changed in version " + ver + ")'' " + msg, NoPosition)
-          case (Some(msg), None) => parseWiki(msg, NoPosition)
-          case (None, Some(ver)) =>  parseWiki("''(Changed in version " + ver + ")''", NoPosition)
+          case (Some(msg), Some(ver)) => parseWiki("''(Changed in version " + ver + ")'' " + msg, NoPosition, Some(inTpl))
+          case (Some(msg), None) => parseWiki(msg, NoPosition, Some(inTpl))
+          case (None, Some(ver)) =>  parseWiki("''(Changed in version " + ver + ")''", NoPosition, Some(inTpl))
           case (None, None) => Body(Nil)
         })
       else
@@ -439,6 +442,9 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     // We make the diagram a lazy val, since we're not sure we'll include the diagrams in the page
     lazy val inheritanceDiagram = makeInheritanceDiagram(this)
     lazy val contentDiagram = makeContentDiagram(this)
+
+    // locating members
+    def lookupMember(pos: Position, query: String): LinkTo = memberLookup(pos, query, this)
   }
 
   abstract class PackageImpl(sym: Symbol, inTpl: PackageImpl) extends DocTemplateImpl(sym, inTpl) with Package {
@@ -546,7 +552,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
           import Streamable._
           Path(settings.docRootContent.value) match {
             case f : File => {
-              val rootComment = closing(f.inputStream)(is => parse(slurp(is), "", NoPosition))
+              val rootComment = closing(f.inputStream)(is => parse(slurp(is), "", NoPosition, Some(inTpl)))
               Some(rootComment)
             }
             case _ => None
@@ -744,6 +750,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     inTpl.members.find(_.sym == aSym)
   }
 
+  @deprecated("2.10", "Use findLinkTarget instead!")
   def findTemplate(query: String): Option[DocTemplateImpl] = {
     assert(modelFinished)
     docTemplatesCache.values find { (tpl: DocTemplateImpl) => tpl.qualifiedName == query && !packageDropped(tpl) && !tpl.isObject }
@@ -775,7 +782,6 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
         makeNoDocTemplate(bSym, if (inTpl.isDefined) inTpl.get else makeTemplate(bSym.owner))
     }
   }
-
 
   /** */
   def makeAnnotation(annot: AnnotationInfo): Annotation = {

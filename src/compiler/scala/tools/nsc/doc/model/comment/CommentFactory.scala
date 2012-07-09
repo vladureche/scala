@@ -31,7 +31,7 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
   protected val commentCache = mutable.HashMap.empty[(global.Symbol, TemplateImpl), Comment]
 
   def addCommentBody(sym: global.Symbol, inTpl: TemplateImpl, docStr: String, docPos: global.Position): global.Symbol = {
-    commentCache += (sym, inTpl) -> parse(docStr, docStr, docPos)
+    commentCache += (sym, inTpl) -> parse(docStr, docStr, docPos, None)
     sym
   }
 
@@ -87,7 +87,7 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
     else {
       val rawComment = global.expandedDocComment(sym, inTpl.sym).trim
       if (rawComment != "") {
-        val c = parse(rawComment, global.rawDocComment(sym), global.docCommentPos(sym))
+        val c = parse(rawComment, global.rawDocComment(sym), global.docCommentPos(sym), Some(inTpl))
         Some(c)
       }
       else None
@@ -225,7 +225,7 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
     * @param comment The expanded comment string (including start and end markers) to be parsed.
     * @param src     The raw comment source string.
     * @param pos     The position of the comment in source. */
-  protected def parse(comment: String, src: String, pos: Position): Comment = {
+  protected def parse(comment: String, src: String, pos: Position, inTplOpt: Option[DocTemplateImpl] = None): Comment = {
 
     /** The cleaned raw comment as a list of lines. Cleaning removes comment
       * start and end markers, line start markers  and unnecessary whitespace. */
@@ -351,7 +351,7 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
         val tagsWithoutDiagram = tags.filterNot(pair => pair._1 == inheritDiagramTag || pair._1 == contentDiagramTag)
 
         val bodyTags: mutable.Map[TagKey, List[Body]] =
-          mutable.Map(tagsWithoutDiagram mapValues {tag => tag map (parseWiki(_, pos))} toSeq: _*)
+          mutable.Map(tagsWithoutDiagram mapValues {tag => tag map (parseWiki(_, pos, inTplOpt))} toSeq: _*)
 
         def oneTag(key: SimpleTagKey): Option[Body] =
           ((bodyTags remove key): @unchecked) match {
@@ -384,7 +384,7 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
         }
 
         val com = createComment (
-          body0           = Some(parseWiki(docBody.toString, pos)),
+          body0           = Some(parseWiki(docBody.toString, pos, inTplOpt)),
           authors0        = allTags(SimpleTagKey("author")),
           see0            = allTags(SimpleTagKey("see")),
           result0         = oneTag(SimpleTagKey("return")),
@@ -420,8 +420,8 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
     *  - Removed start-of-line star and one whitespace afterwards (if present).
     *  - Removed all end-of-line whitespace.
     *  - Only `endOfLine` is used to mark line endings. */
-  def parseWiki(string: String, pos: Position): Body = {
-    new WikiParser(string, pos).document()
+  def parseWiki(string: String, pos: Position, inTplOpt: Option[DocTemplateImpl]): Body = {
+    new WikiParser(string, pos, inTplOpt).document()
   }
 
   /** TODO
@@ -429,7 +429,7 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
     * @author Ingo Maier
     * @author Manohar Jonnalagedda
     * @author Gilles Dubochet */
-  protected final class WikiParser(val buffer: String, pos: Position) extends CharReader(buffer) { wiki =>
+  protected final class WikiParser(val buffer: String, pos: Position, inTplOpt: Option[DocTemplateImpl]) extends CharReader(buffer) { wiki =>
 
     var summaryParsed = false
 
@@ -733,15 +733,17 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
         case (SchemeUri(uri), optTitle) =>
           Link(uri, optTitle getOrElse Text(uri))
         case (qualName, optTitle) =>
-          optTitle foreach (text => reportError(pos, "entity link to " + qualName + " cannot have a custom title'" + text + "'"))
+          // optTitle foreach (text => reportError(pos, "entity link to " + qualName + " cannot have a custom title'" + text + "'"))
           // XXX rather than warning here we should allow unqualified names
           // to refer to members of the same package.  The "package exists"
           // exclusion is because [[scala]] is used in some scaladoc.
-          if (!qualName.contains(".") && !definitions.packageExists(qualName))
-            reportError(pos, "entity link to " + qualName + " should be a fully qualified name")
-
+          //if (!qualName.contains(".") && !definitions.packageExists(qualName))
+          //  reportError(pos, "entity link to " + qualName + " should be a fully qualified name")
           // move the template resolution as late as possible
-          EntityLink(qualName, () => findTemplate(qualName))
+          inTplOpt match {
+            case Some(dtpl) => new EntityLink(optTitle getOrElse Text(target)) { lazy val link = dtpl.lookupMember(pos, target)}
+            case None =>       new EntityLink(optTitle getOrElse Text(target)) { lazy val link = Tooltip(qualName)}
+          }
       }
     }
 

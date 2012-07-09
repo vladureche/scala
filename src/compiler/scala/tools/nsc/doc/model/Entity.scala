@@ -56,6 +56,12 @@ trait Entity {
 
   /** Whether or not the template was defined in a package object */
   def inPackageObject: Boolean
+
+  /** Indicates whether this entity lives in the types namespace (classes, traits, abstract/alias types) */
+  def isType: Boolean
+
+  /** Indicates whether this entity lives in the terms namespace (objects, packages, methods, values) */
+  def isTerm: Boolean
 }
 
 object Entity {
