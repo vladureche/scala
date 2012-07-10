@@ -23,7 +23,7 @@ import language.postfixOps
   *
   * @author Manohar Jonnalagedda
   * @author Gilles Dubochet */
-trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
+trait CommentFactory { thisFactory: ModelFactory with CommentFactory with MemberLookup=>
 
   val global: Global
   import global.{ reporter, definitions }
@@ -226,6 +226,7 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
     * @param src     The raw comment source string.
     * @param pos     The position of the comment in source. */
   protected def parse(comment: String, src: String, pos: Position, inTplOpt: Option[DocTemplateImpl] = None): Comment = {
+    assert(!inTplOpt.isDefined || inTplOpt.get != null)
 
     /** The cleaned raw comment as a list of lines. Cleaning removes comment
       * start and end markers, line start markers  and unnecessary whitespace. */
@@ -421,6 +422,8 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
     *  - Removed all end-of-line whitespace.
     *  - Only `endOfLine` is used to mark line endings. */
   def parseWiki(string: String, pos: Position, inTplOpt: Option[DocTemplateImpl]): Body = {
+    assert(!inTplOpt.isDefined || inTplOpt.get != null)
+
     new WikiParser(string, pos, inTplOpt).document()
   }
 
@@ -430,6 +433,7 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
     * @author Manohar Jonnalagedda
     * @author Gilles Dubochet */
   protected final class WikiParser(val buffer: String, pos: Position, inTplOpt: Option[DocTemplateImpl]) extends CharReader(buffer) { wiki =>
+    assert(!inTplOpt.isDefined || inTplOpt.get != null)
 
     var summaryParsed = false
 
@@ -617,7 +621,7 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
         else if (check(",,")) subscript()
         else if (check("[[")) link()
         else {
-          readUntil { char == safeTagMarker || check("''") || char == '`' || check("__") || char == '^' || check(",,") || check("[[") || isInlineEnd || checkParaEnded || char == endOfLine }
+          readUntil { char == safeTagMarker || check("''") || char == '`' || check("__") || char == '^' || check(",,") || check("[[") || check("{{") || isInlineEnd || checkParaEnded || char == endOfLine }
           Text(getRead())
         }
       }
@@ -719,31 +723,27 @@ trait CommentFactory { thisFactory: ModelFactory with CommentFactory =>
     def link(): Inline = {
       val SchemeUri = """([^:]+:.*)""".r
       jump("[[")
-      readUntil { check("]]") || check(" ") }
+      var parens = 1
+      readUntil { parens += 1; !check("[") }
+      getRead // clear the buffer
+      val start = "[" * parens
+      val stop  = "]" * parens
+      //println("link with " + parens + " matching parens")
+      readUntil { check(stop) || check(" ") }
       val target = getRead()
       val title =
-        if (!check("]]")) Some({
+        if (!check(stop)) Some({
           jump(" ")
-          inline(check("]]"))
+          inline(check(stop))
         })
         else None
-      jump("]]")
+      jump(stop)
 
       (target, title) match {
         case (SchemeUri(uri), optTitle) =>
           Link(uri, optTitle getOrElse Text(uri))
         case (qualName, optTitle) =>
-          // optTitle foreach (text => reportError(pos, "entity link to " + qualName + " cannot have a custom title'" + text + "'"))
-          // XXX rather than warning here we should allow unqualified names
-          // to refer to members of the same package.  The "package exists"
-          // exclusion is because [[scala]] is used in some scaladoc.
-          //if (!qualName.contains(".") && !definitions.packageExists(qualName))
-          //  reportError(pos, "entity link to " + qualName + " should be a fully qualified name")
-          // move the template resolution as late as possible
-          inTplOpt match {
-            case Some(dtpl) => new EntityLink(optTitle getOrElse Text(target)) { lazy val link = dtpl.lookupMember(pos, target)}
-            case None =>       new EntityLink(optTitle getOrElse Text(target)) { lazy val link = Tooltip(qualName)}
-          }
+          new EntityLink(optTitle getOrElse Text(target)) { def link = memberLookup(pos, target, inTplOpt) }
       }
     }
 

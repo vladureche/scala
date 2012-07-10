@@ -128,7 +128,7 @@ abstract class HtmlPage extends Page { thisPage =>
   def linkToHtml(text: Inline, link: LinkTo, hasLinks: Boolean) = link match {
     case LinkToTpl(dtpl) =>
       if (hasLinks)
-        <a href={ relativeLinkTo(dtpl) } class="extype" name={ dtpl.qualifiedName }>{ text }</a>
+        <a href={ relativeLinkTo(dtpl) } class="extype" name={ dtpl.qualifiedName }>{ inlineToHtml(text) }</a>
       else
         <span class="extype" name={ dtpl.qualifiedName }>{ inlineToHtml(text) }</span>
     case LinkToMember(mbr, inTpl) =>

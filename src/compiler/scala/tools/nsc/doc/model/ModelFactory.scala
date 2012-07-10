@@ -216,28 +216,34 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     def byConversion = if (implConv ne null) Some(implConv) else None
     lazy val signature = {
 
-      val defParamsString = this match {
+      def defParams(mbr: Any): String = mbr match {
         case d: MemberEntity with Def =>
           val paramLists: List[String] =
-          if (d.valueParams.isEmpty) Nil
-          else d.valueParams map (ps => ps map (_.resultType.name) mkString ("(",",",")"))
-
-          val tParams = if (d.typeParams.isEmpty) "" else {
-            def boundsToString(hi: Option[TypeEntity], lo: Option[TypeEntity]): String = {
-              def bound0(bnd: Option[TypeEntity], pre: String): String = bnd match {
-                case None => ""
-                case Some(tpe) => pre ++ tpe.toString
-              }
-              bound0(hi, "<:") ++ bound0(lo, ">:")
-            }
-            "[" + d.typeParams.map(tp => tp.variance + tp.name + boundsToString(tp.hi, tp.lo)).mkString(", ") + "]"
-          }
-
-          tParams + paramLists.mkString
+            if (d.valueParams.isEmpty) Nil
+            else d.valueParams map (ps => ps map (_.resultType.name) mkString ("(",",",")"))
+          paramLists.mkString
         case _ => ""
       }
-      name + defParamsString +":"+ resultType.name
+
+      def tParams(mbr: Any): String = mbr match {
+        case hk: HigherKinded if !hk.typeParams.isEmpty =>
+          def boundsToString(hi: Option[TypeEntity], lo: Option[TypeEntity]): String = {
+            def bound0(bnd: Option[TypeEntity], pre: String): String = bnd match {
+              case None => ""
+              case Some(tpe) => pre ++ tpe.toString
+            }
+            bound0(hi, "<:") ++ bound0(lo, ">:")
+          }
+          "[" + hk.typeParams.map(tp => tp.variance + tp.name + tParams(tp) + boundsToString(tp.hi, tp.lo)).mkString(", ") + "]"
+        case _ => ""
+      }
+
+      (name + tParams(this) + defParams(this) +":"+ resultType.name).replaceAll("\\s","") // no spaces allowed, they break links
     }
+    def isImplicitlyInherited = { assert(modelFinished); byConversion.isDefined }
+    def isShadowedImplicit    = isImplicitlyInherited && inTpl.implicitsShadowing.get(this).map(_.isShadowed).getOrElse(false)
+    def isAmbiguousImplicit   = isImplicitlyInherited && inTpl.implicitsShadowing.get(this).map(_.isAmbiguous).getOrElse(false)
+    def isShadowedOrAmbiguousImplicit = isShadowedImplicit || isAmbiguousImplicit
   }
 
   /** A template that is not documented at all. The class is instantiated during lookups, to indicate that the class
@@ -442,9 +448,6 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     // We make the diagram a lazy val, since we're not sure we'll include the diagrams in the page
     lazy val inheritanceDiagram = makeInheritanceDiagram(this)
     lazy val contentDiagram = makeContentDiagram(this)
-
-    // locating members
-    def lookupMember(pos: Position, query: String): LinkTo = memberLookup(pos, query, this)
   }
 
   abstract class PackageImpl(sym: Symbol, inTpl: PackageImpl) extends DocTemplateImpl(sym, inTpl) with Package {
@@ -552,7 +555,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
           import Streamable._
           Path(settings.docRootContent.value) match {
             case f : File => {
-              val rootComment = closing(f.inputStream)(is => parse(slurp(is), "", NoPosition, Some(inTpl)))
+              val rootComment = closing(f.inputStream)(is => parse(slurp(is), "", NoPosition, Option(inTpl)))
               Some(rootComment)
             }
             case _ => None
