@@ -44,6 +44,12 @@ class DocFactory(val reporter: Reporter, val settings: doc.Settings) { processor
       phasesSet += refChecks
     }
     override def forScaladoc = true
+
+    //fill the globalLinks map with values passed on the CLI
+    val docSettings = settings.asInstanceOf[doc.Settings]
+    val externalUrls = (for(split <- docSettings.externalDocLinkUrls.value.map(_.split("::")) if split.length == 2)
+                       yield (split(0) -> split(1))).toMap
+    docSettings.hardcoded.globalLinks = docSettings.hardcoded.globalLinks ++ externalUrls
   }
 
   /** Creates a scaladoc site for all symbols defined in this call's `source`,

@@ -363,9 +363,14 @@ trait DocComments { self: Global =>
               }
             case "" => idx += 1
             case vname  =>
-              lookupVariable(vname, site) match {
-                case Some(replacement) => replaceWith(replacement)
-                case None              => reporter.warning(sym.pos, "Variable " + vname + " undefined in comment for " + sym + " in " + site)
+             val docSettings = settings.asInstanceOf[doc.Settings]
+              docSettings.hardcoded.globalLinks.get(vname) match {
+                case Some(link) => replaceWith(link)
+                case None =>
+                  lookupVariable(vname, site) match {
+                    case Some(replacement) => replaceWith(replacement)
+                    case None              => reporter.warning(sym.pos, "Variable " + vname + " undefined in comment for " + sym + " in " + site)
+                  }
               }
             }
         }

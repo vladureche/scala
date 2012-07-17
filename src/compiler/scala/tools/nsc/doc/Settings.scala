@@ -188,6 +188,17 @@ class Settings(error: String => Unit, val printMsg: String => Unit = println(_))
     "Expand all type aliases and abstract types into full template pages. (locally this can be done with the @template annotation)"
   )
 
+  /**
+   * a list of base urls for expanding variables
+   * for external links in comments
+   */
+  val externalDocLinkUrls = MultiStringSetting (
+     "-external-link-url",
+     "url",
+     "base urls for external links in documentation. Example: "+
+     "SCALALIB::http://www.scalalib.org AKKALIB::http://www.akkalib.org"
+  )
+
   // Somewhere slightly before r18708 scaladoc stopped building unless the
   // self-type check was suppressed.  I hijacked the slotted-for-removal-anyway
   // suppress-vt-warnings option and renamed it for this purpose.
@@ -201,7 +212,7 @@ class Settings(error: String => Unit, val printMsg: String => Unit = println(_))
     docImplicits, docImplicitsDebug, docImplicitsShowAll,
     docDiagramsMaxNormalClasses, docDiagramsMaxImplicitClasses,
     docNoPrefixes, docNoLinkWarnings, docRawOutput, docSkipPackages,
-    docExpandAllTypes
+    docExpandAllTypes, externalDocLinkUrls
   )
   val isScaladocSpecific: String => Boolean = scaladocSpecific map (_.name)
 
@@ -309,5 +320,10 @@ class Settings(error: String => Unit, val printMsg: String => Unit = println(_))
 
       true
     }
+    
+    var globalLinks = Map("SCALALIB" -> "http://www.scala-lang.org/api/current/index.html",
+                          "AKKALIB" -> "doc.akka.io/api/akka/2.0.2/",
+                          "JAVALIB" -> "http://docs.oracle.com/javase/6/docs/api"
+                      )
   }
 }
