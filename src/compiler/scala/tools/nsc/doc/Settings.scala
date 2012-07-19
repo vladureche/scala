@@ -321,8 +321,8 @@ class Settings(error: String => Unit, val printMsg: String => Unit = println(_))
       true
     }
     
-    var globalLinks = Map("SCALALIB" -> "http://www.scala-lang.org/api/current/index.html",
-                          "AKKALIB" -> "doc.akka.io/api/akka/2.0.2/",
+    var globalLinks = Map("SCALALIB" -> "http://www.scala-lang.org/api/current",
+                          "AKKALIB" -> "http://doc.akka.io/api/akka/2.0.2",
                           "JAVALIB" -> "http://docs.oracle.com/javase/6/docs/api"
                       )
   }

@@ -362,15 +362,17 @@ trait DocComments { self: Global =>
                   if (!isMovable(sc, sec)) out append sc.substring(start, end)
               }
             case "" => idx += 1
-            case vname  =>
-             val docSettings = settings.asInstanceOf[doc.Settings]
-              docSettings.hardcoded.globalLinks.get(vname) match {
+            case vname  => 
+              val globalMapping: Option[String] = settings match {
+                case dsett:doc.Settings => dsett.hardcoded.globalLinks.get(vname)
+                case _ => None
+              }
+              globalMapping match {
                 case Some(link) => replaceWith(link)
-                case None =>
-                  lookupVariable(vname, site) match {
+                case _ =>  lookupVariable(vname, site) match {
                     case Some(replacement) => replaceWith(replacement)
                     case None              => reporter.warning(sym.pos, "Variable " + vname + " undefined in comment for " + sym + " in " + site)
-                  }
+                }
               }
             }
         }

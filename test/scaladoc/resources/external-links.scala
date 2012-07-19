@@ -4,8 +4,8 @@ package scala.test.scaladoc.externallinks {
   
   /**
    *  Links to the trait:
-   *  - [[SCALALIB#scala.collection.immutable.List List]]
-   *  - [[AKKALIB#akka.actor.Actor Actor]]
+   *  - [[SCALALIB/scala/collection/immutable/List List]]
+   *  - [[AKKALIB/akka/actor/Actor Actor]]
    */
   object TEST {
     def localMethod = 3

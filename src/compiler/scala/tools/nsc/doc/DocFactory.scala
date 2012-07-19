@@ -46,10 +46,13 @@ class DocFactory(val reporter: Reporter, val settings: doc.Settings) { processor
     override def forScaladoc = true
 
     //fill the globalLinks map with values passed on the CLI
-    val docSettings = settings.asInstanceOf[doc.Settings]
-    val externalUrls = (for(split <- docSettings.externalDocLinkUrls.value.map(_.split("::")) if split.length == 2)
-                       yield (split(0) -> split(1))).toMap
-    docSettings.hardcoded.globalLinks = docSettings.hardcoded.globalLinks ++ externalUrls
+    settings match {
+      case dsett : doc.Settings =>
+          val externalUrls = (for(split <- dsett.externalDocLinkUrls.value.map(_.split("::")) if split.length == 2)
+                      yield (split(0) -> split(1))).toMap
+          dsett.hardcoded.globalLinks = dsett.hardcoded.globalLinks ++ externalUrls
+      case _ => ()
+    }
   }
 
   /** Creates a scaladoc site for all symbols defined in this call's `source`,
