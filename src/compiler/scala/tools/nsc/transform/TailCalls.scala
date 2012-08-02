@@ -328,14 +328,10 @@ abstract class TailCalls extends Transform {
               val valTransformer = new TreeSymSubstituter(vpSyms, newCtx.params)
               valTransformer.transform(newRHS)
 
-              // transform this to _this
-              val thisTransformer = new ThisSubstituter(dd.symbol.enclClass, typed(Ident(newCtx.thisParam)))
-              thisTransformer.transform(newRHS)
+              // transform this to _this => not necessary, as the backend will take care of this :)
 
-              val result = typedPos(tree.pos)(
-                Block(thisValDef :: paramValDef, LabelDef(newCtx.label, newCtx.label.info.params, newRHS)))
-
-              result
+              // final tree
+              typedPos(tree.pos)(Block(thisValDef :: paramValDef, LabelDef(newCtx.label, newCtx.label.info.params, newRHS)))
             }
             else {
               if (newCtx.isMandatory && newRHS.exists(isRecursiveCall))
