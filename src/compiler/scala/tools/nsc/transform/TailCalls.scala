@@ -138,7 +138,6 @@ abstract class TailCalls extends Transform {
         this.tailLabels = that.tailLabels
         this.params     = that.params
         this.thisParam  = that.thisParam
-        this.thisValue  = that.thisValue
       }
       def this(dd: DefDef) {
         this()
@@ -146,20 +145,19 @@ abstract class TailCalls extends Transform {
         this.tparams   = dd.tparams map (_.symbol)
         this.tailPos   = true
         this.failPos   = dd.pos
-        this.thisParam = method.newVariable(newTermName("_this"), dd.pos.makeTransparent, SYNTHETIC) setInfo currentClass.typeOfThis
+        this.thisParam = method.newValueParameter(nme.THIS, dd.pos.focus, MUTABLE|SYNTHETIC).setInfo(currentClass.typeOfThis)
 
         /** Create a new method symbol for the current method and store it in
           * the label field.
           */
         this.label    = {
           val label      = method.newLabel(newTermName("_" + method.name), method.pos)
-          this.thisValue = method.newSyntheticValueParam(currentClass.typeOfThis)
           this.params    = method.tpe.params.map(param => method.newVariable(newTermName("_" + param.name.toString), param.pos.makeTransparent).setInfo(param.info).setFlag(SYNTHETIC))
 
           // The label doesn't take any parameters, so the control flow can go in it
           label setInfo MethodType(Nil, method.tpe.finalResultType)
         }
-        if (isEligible) 
+        if (isEligible)
           (label :: thisParam :: params) map (_.substInfo(method.tpe.typeParams, tparams))
       }
 
@@ -231,11 +229,25 @@ abstract class TailCalls extends Transform {
         def rewriteTailCall(recv: Tree): Tree = {
           debuglog("Rewriting tail recursive call:  " + fun.pos.lineContent.trim)
 
-          accessed += ctx.label
-          val thisAssign  = Assign(Ident(ctx.thisParam), recv)
-          val paramAssign = for ((param, value) <- ctx.params zip transformArgs) yield Assign(Ident(param), value)
+          def isTrivial(kv: (Tree, Symbol)) = kv match {
+            case (This(_), p) if p.name == nme.THIS     => true
+            case (arg @ Ident(_), p) if arg.symbol == p => true
+            case _                                      => false
+          }
 
-          typedPos(fun.pos)(Block(thisAssign::paramAssign, Apply(Ident(ctx.label), Nil)))
+          accessed += ctx.label
+          // we might need to reshuffle parameters, so we need a structure like:
+          // val x$1 = _this
+          // val x$2 = _other
+          // _this = x$2
+          // _other = x$1
+          val assignments = (recv::transformArgs) zip (ctx.thisParam::ctx.params) filterNot isTrivial map {
+            case (value, param) =>
+              val temp = ctx.method.newSyntheticValueParam(param.tpe)
+              (ValDef(temp, value), Assign(Ident(param), Ident(temp)))
+          } unzip match { case (l1, l2) => l1:::l2 }
+
+          typedPos(fun.pos)(Block(assignments, Apply(Ident(ctx.label), Nil)))
         }
 
         if (!ctx.isEligible)            fail("it is neither private nor final so can be overridden")

@@ -285,6 +285,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
        extends MemberDef with TypeDefApi
   object TypeDef extends TypeDefExtractor
 
+  /** NOTE: LabelDefs into which the control flow can go into must not have parameters */
   case class LabelDef(name: TermName, params: List[Ident], rhs: Tree)
        extends DefTree with TermTree with LabelDefApi
   object LabelDef extends LabelDefExtractor
@@ -1024,14 +1025,14 @@ trait Trees extends api.Trees { self: SymbolTable =>
     }
   }
 
-    
+
   /** Delegate for a TypeTree symbol. This operation is unsafe because
    *  it may trigger type checking when forcing the type symbol of the
    *  underlying type.
    */
   protected def typeTreeSymbol(tree: TypeTree): Symbol =
     if (tree.tpe == null) null else tree.tpe.typeSymbol
-  
+
   // --- generic traversers and transformers
 
   override protected def itraverse(traverser: Traverser, tree: Tree): Unit = {
