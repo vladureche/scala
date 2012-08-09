@@ -1,0 +1,6 @@
+7
+Method call statistics:
+    1  instrumented/Bar.bar(Linstrumented/Foo;)V
+    1  instrumented/Foo$class.foo(Linstrumented/Foo;I)V
+    1  scala/Predef$.println(Ljava/lang/Object;)V
+    1  scala/runtime/BoxesRunTime.boxToInteger(I)Ljava/lang/Integer;

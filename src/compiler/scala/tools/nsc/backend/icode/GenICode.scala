@@ -125,7 +125,7 @@ abstract class GenICode extends SubComponent  {
             // in companion object accessors to @static fields, we access the static field directly
             val hostClass = m.symbol.owner.companionClass
             val staticfield = hostClass.info.findMember(m.symbol.accessed.name, NoFlags, NoFlags, false)
-            
+
             if (m.symbol.isGetter) {
               ctx1.bb.emit(LOAD_FIELD(staticfield, true) setHostClass hostClass, tree.pos)
               ctx1.bb.closeWith(RETURN(m.returnType))
@@ -879,7 +879,7 @@ abstract class GenICode extends SubComponent  {
           ctx1
 
         case app @ Apply(fun @ Select(qual, _), args)
-        if !ctx.method.symbol.isStaticConstructor 
+        if !ctx.method.symbol.isStaticConstructor
         && fun.symbol.isAccessor && fun.symbol.accessed.hasStaticAnnotation =>
           // bypass the accessor to the companion object and load the static field directly
           // the only place were this bypass is not done, is the static intializer for the static field itself
@@ -887,7 +887,7 @@ abstract class GenICode extends SubComponent  {
           generatedType = toTypeKind(sym.accessed.info)
           val hostClass = qual.tpe.typeSymbol.orElse(sym.owner).companionClass
           val staticfield = hostClass.info.findMember(sym.accessed.name, NoFlags, NoFlags, false)
-          
+
           if (sym.isGetter) {
             ctx.bb.emit(LOAD_FIELD(staticfield, true) setHostClass hostClass, tree.pos)
             ctx
@@ -900,10 +900,13 @@ abstract class GenICode extends SubComponent  {
             assert(false, "supposedly unreachable")
             ctx
           }
-        
-        case app @ Apply(fun, args) =>
-          val sym = fun.symbol
-          
+
+        case app @ Apply(fun1, args1) =>
+          // we might decide to change these later
+          var fun = fun1
+          var args = args1
+          var sym = fun.symbol
+
           if (sym.isLabel) {  // jump to a label
             val label = ctx.labels.getOrElse(sym, {
               // it is a forward jump, scan for labels
@@ -933,6 +936,46 @@ abstract class GenICode extends SubComponent  {
             newCtx
           } else {  // normal method call
             debuglog("Gen CALL_METHOD with sym: " + sym + " isStaticSymbol: " + sym.isStaticMember);
+
+            // Inlining methods in traits:
+            //
+            // Traits consist of interfaces and implementation classes. A class that inherits from a trait will actually
+            // implement the interface and unless it overrides the member, will get a forwarder to the implementation
+            // class like this:
+            //  class FooImpl extends Object with Foo {
+            //    @scala.this.inline <method> final <existential/mixedin> <triedcooking> def foo(x: Int): Unit = Foo$class.foo(FooImpl.this, x);
+            //    ...
+            //  };
+            // If in the signature we get a trait, we get a java interface, thus any call to the trait's methods is
+            // translated to a call to the interface, and the inliner has no implementation to inline.
+            //
+            // So, if a trait has a final method and that final method has an implementation in the implementation class
+            // we want to avoid the call through the interface, which prevents the inliner from inlining the call. We do
+            // this by rewriting the call to target the implementation class instead of the interface.
+            //
+            // We only do this if the method is final and marked with @inline
+            fun match {
+              case Select(qual, _) if { val qualSym = findHostClass(qual.tpe, sym)
+                                        sym.isFinal && sym.hasAnnotation(definitions.ScalaInlineClass) &&
+                                        qualSym.isTrait &&
+                                        !qualSym.isImplClass &&
+                                        (qualSym.implClass != NoSymbol) } =>
+
+                val qualSym = findHostClass(qual.tpe, sym)
+                val newTree = Apply(Select(Ident(qualSym.implClass), Ident(sym.name).toString), qual :: args)
+                typer.silent(_.typed(atPos(tree.pos)(newTree))) match {
+                  case global.analyzer.SilentResultValue(newApply: Apply) =>
+                    // okay, typed successfully, now replace fun and args with the new values for the implementation
+                    fun = newApply.fun
+                    args = newApply.args
+                    sym = fun.symbol
+                  case _ =>
+                    // report error or unexpected result
+                    global.reporter.warning(sym.pos, "Could not inline the final @inline " + sym + " in " + qualSym + " here.")
+                }
+              case _ =>
+            }
+
             val invokeStyle =
               if (sym.isStaticMember)
                 Static(false)

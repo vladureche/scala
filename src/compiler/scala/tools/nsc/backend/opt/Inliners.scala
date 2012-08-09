@@ -788,8 +788,12 @@ abstract class Inliners extends SubComponent {
 
         assert(!instrAfter.isEmpty, "CALL_METHOD cannot be the last instruction in block!")
 
-        // store the '$this' into the special local
-        val inlinedThis = newLocal("$inlThis", REFERENCE(ObjectClass))
+        // store the '$this' into the special local, if there is a this involved
+        val inlinedThis =
+          if (instr.style.hasInstance)
+            Some(newLocal("$inlThis", REFERENCE(ObjectClass)))
+          else
+            None
 
         /** buffer for the returned value */
         val retVal = inc.m.returnType match {
@@ -804,7 +808,8 @@ abstract class Inliners extends SubComponent {
           val b = caller.m.code.newBlock
           activeHandlers foreach (_ addCoveredBlock b)
           if (retVal ne null) b.varsInScope += retVal
-          b.varsInScope += inlinedThis
+          if (inlinedThis.isDefined)
+            b.varsInScope += inlinedThis.get
           b.varsInScope ++= varsInScope
           b
         }
@@ -839,8 +844,8 @@ abstract class Inliners extends SubComponent {
           def isInlined(l: Local) = inlinedLocals isDefinedAt l
 
           val newInstr = i match {
-            case THIS(clasz)                    => LOAD_LOCAL(inlinedThis)
-            case STORE_THIS(_)                  => STORE_LOCAL(inlinedThis)
+            case THIS(clasz)                    => LOAD_LOCAL(inlinedThis.get)  // if inlinedThis is None, it means we're
+            case STORE_THIS(_)                  => STORE_LOCAL(inlinedThis.get) // in a static call, so no THIS/STORE_THIS
             case JUMP(whereto)                  => JUMP(inlinedBlock(whereto))
             case CJUMP(succ, fail, cond, kind)  => CJUMP(inlinedBlock(succ), inlinedBlock(fail), cond, kind)
             case CZJUMP(succ, fail, cond, kind) => CZJUMP(inlinedBlock(succ), inlinedBlock(fail), cond, kind)
@@ -869,7 +874,8 @@ abstract class Inliners extends SubComponent {
         }
 
         caller addLocals (inc.locals map dupLocal)
-        caller addLocal inlinedThis
+        if (inlinedThis.isDefined)
+          caller addLocal inlinedThis.get
 
         if (retVal ne null)
           caller addLocal retVal
@@ -886,7 +892,8 @@ abstract class Inliners extends SubComponent {
 
         // store the arguments into special locals
         inc.m.params.reverse foreach (p => blockEmit(STORE_LOCAL(inlinedLocals(p))))
-        blockEmit(STORE_LOCAL(inlinedThis))
+        if (inlinedThis.isDefined)
+          blockEmit(STORE_LOCAL(inlinedThis.get))
 
         // jump to the start block of the callee
         blockEmit(JUMP(inlinedBlock(inc.m.startBlock)))
