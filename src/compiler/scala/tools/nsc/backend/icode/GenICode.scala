@@ -961,18 +961,75 @@ abstract class GenICode extends SubComponent  {
                                         !qualSym.isImplClass &&
                                         (qualSym.implClass != NoSymbol) } =>
 
+                println("attempt to inline " + sym + " in " + tree.pos)
+
                 val qualSym = findHostClass(qual.tpe, sym)
-                val newTree = Apply(Select(Ident(qualSym.implClass), Ident(sym.name).toString), qual :: args)
-                typer.silent(_.typed(atPos(tree.pos)(newTree))) match {
-                  case global.analyzer.SilentResultValue(newApply: Apply) =>
-                    // okay, typed successfully, now replace fun and args with the new values for the implementation
-                    fun = newApply.fun
-                    args = newApply.args
-                    sym = fun.symbol
-                  case _ =>
-                    // report error or unexpected result
-                    global.reporter.warning(sym.pos, "Could not inline the final @inline " + sym + " in " + qualSym + " here.")
+                val implClass = qualSym.implClass
+                def matches(other: Symbol): Boolean = {
+                  other.tpe match {
+                    case MethodType(params, returnType) =>
+                      !params.isEmpty &&
+                      typeCompare.typeMatches(params.head.tpe, qual.tpe) &&
+                      (params.tail zip args forall { case (sym1, tree2) => typeCompare.typeMatches(sym1.tpe, tree2.tpe) }) &&
+                      typeCompare.typeMatches(returnType, sym.info.resultType)
+                    case _ => false
+                  }
                 }
+
+                object typeCompare {
+                  def typeMatches(t1: Type, t2: Type): Boolean = {
+                    if (t1.typeSymbol == definitions.ArrayClass &&
+                        t2.typeSymbol == definitions.ArrayClass)
+                        typesMatch(t1.typeArgs, t2.typeArgs)
+                    else
+                      t1.typeSymbol == t2.typeSymbol
+                  }
+                  def typesMatch(tl1: List[Type], tl2: List[Type]) =
+                    (tl1.length == tl2.length) && (tl1 zip tl2 forall { case (t1, t2) => typeMatches(t1, t2) })
+                }
+
+                val implType = MethodType(qualSym::sym.info.params, sym.info.resultType)
+                val newMember: Option[Symbol] = implClass.info.member(sym.name) match {
+                  case NoSymbol => None                  // No syms with that name
+                  case mth if matches(mth) => Some(mth)  // Symbol found
+                  case mth =>
+                    mth.info match {
+                      case OverloadedType(owner, alternatives) =>
+                        alternatives.find(matches(_))
+                      case _ =>
+                        None
+                    }
+                }
+
+                if (newMember.isDefined) {
+                  // okay, found the new member
+                  global.reporter.warning(tree.pos, "Found new symbol: " + newMember.get + " : " + newMember.get.tpe)
+                  println("success!!!!")
+
+                  // now, to build the tree:
+                  val qualifier = mkAttributedQualifier(implClass.tpe, implClass)
+                  //println(qualifier)
+                  val method = global.gen.mkMethodCall(qualifier, newMember.get, Nil, qual::args)
+                  //println(method)
+                  method match {
+                    case Apply(fun2, args2) =>
+                      fun = fun2
+                      args = args2
+                      sym = fun2.symbol
+                  }
+                }
+                // val newTree = Apply(Select(Ident(qualSym.implClass), Ident(sym.name).toString), qual :: args)
+                // typer.silent(_.typed(atPos(tree.pos)(newTree))) match {
+                //   case global.analyzer.SilentResultValue(newApply: Apply) =>
+                //     // okay, typed successfully, now replace fun and args with the new values for the implementation
+                //     global.reporter.warning(tree.pos, newTree.toString)
+                //     fun = newApply.fun
+                //     args = newApply.args
+                //     sym = fun.symbol
+                //   case _ =>
+                //     // report error or unexpected result
+                //     global.reporter.warning(tree.pos, "Could not inline the final @inline " + sym + " in " + qualSym + " here.")
+                // }
               case _ =>
             }
 
