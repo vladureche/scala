@@ -395,7 +395,7 @@ abstract class Inliners extends SubComponent {
 
         debuglog("Treating " + i
               + "\n\treceiver: " + receiver
-              + "\n\ticodes.available: " + isAvailable
+              + "\n\ticodes.available: " + isAvailable + " candidate: " + isCandidate
               + "\n\tconcreteMethod.isEffectivelyFinal: " + concreteMethod.isEffectivelyFinal)
 
         if (isAvailable && isCandidate) {

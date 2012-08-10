@@ -23,6 +23,9 @@ abstract class ICodeReader extends ClassfileParser {
   import global._
   import icodes._
 
+  // signal the ICodeReader encountered an error and it's likely the ICode produced is broken
+  class ICodeReaderException(message: String) extends Exception(message)
+
   var instanceCode: IClass = null          // the ICode class for the current symbol
   var staticCode:   IClass = null          // the ICode class static members
   var method: IMethod = NoIMethod          // the current IMethod
@@ -936,12 +939,12 @@ abstract class ICodeReader extends ClassfileParser {
       def checkValidIndex() {
         locals.get(idx - 1) match {
           case Some(others) if others exists (_._2.isWideType) =>
-            global.globalError("Illegal index: " + idx + " points in the middle of another local")
+            throw new ICodeReaderException("Illegal index: " + idx + " points in the middle of another local")
           case _ => ()
         }
         kind match {
           case LONG | DOUBLE if (locals.isDefinedAt(idx + 1)) =>
-            global.globalError("Illegal index: " + idx + " overlaps " + locals(idx + 1) + "\nlocals: " + locals)
+            throw new ICodeReaderException("Illegal index: " + idx + " overlaps " + locals(idx + 1) + "\nlocals: " + locals)
           case _ => ()
         }
       }
@@ -952,11 +955,7 @@ abstract class ICodeReader extends ClassfileParser {
           l match {
             case Some((loc, _)) => loc
             case None =>
-              val l = freshLocal(kind)
-              locals(idx) = (l, kind) :: locals(idx)
-              log("Expected kind " + kind + " for local " + idx +
-                " but only " + ls + " found. Added new local.")
-              l
+              throw new ICodeReaderException("Expected kind " + kind + " for local " + idx + " but only " + ls + " found.")
           }
         case None =>
           checkValidIndex
