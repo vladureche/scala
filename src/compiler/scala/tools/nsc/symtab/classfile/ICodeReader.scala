@@ -192,11 +192,11 @@ abstract class ICodeReader extends ClassfileParser {
       log("classNameToSymbol: found implementation class")
       val iface = rootMirror.staticClass(tpnme.interfaceName(name).toString)
       log("classNameToSymbol: forcing " + iface.owner + " at phase: " + phase + " impl: " + iface.implClass)
-      println("classNameToSymbol: iface: " + iface)
+      log("classNameToSymbol: iface: " + iface)
       iface.owner.info // force the mixin type-transformer
       // broken, it's good that I didn't spend last night debugging for no reason
       val result = beforeFlatten{ iface.implClass }
-      println("classNameToSymbol: impl: " + result)
+      log("classNameToSymbol: impl: " + result)
       result
     }
     else if (nme.isModuleName(name)) {

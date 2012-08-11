@@ -1213,7 +1213,15 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
             // condition set
             val ifaceMethod = sym
             val ifaceClass = sym.owner
-            val implClass = sym.owner.implClass
+            // the dance of rain to compute the implementation class corresponding to the trait:
+            ifaceClass.info // force the info on the trait, so the implementation class symbol is created
+            val implClass = beforeFlatten { ifaceClass.implClass } // load it, but before flatten
+            // why beforeFlatten? well, if the trait's info hasn't been forced by this time, the actual
+            // implementation class will be added to an old version of the scope, before flatten has gotten a chance
+            // to duplicate the scope. Thus we need to look at the old scope, as there is the place we'll find the
+            // correct symbol. If we look at the current symbol, we'll see the Classloader-created symbol, which
+            // doesn't have the desired symbol
+
             // find the implementation method's symbol
             val implMethodLst = beforeMixin(implClass.info.decls.collect {
                 case impl: Symbol if isForwarded(impl) && (impl overriddenSymbol ifaceClass) == ifaceMethod => impl })
