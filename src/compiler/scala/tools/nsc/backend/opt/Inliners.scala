@@ -358,11 +358,11 @@ abstract class Inliners extends SubComponent {
         var inlined = false
         val shouldWarn = hasInline(i.method)
 
-            def warnNoInline(reason: String) = {
-              if (shouldWarn) {
-                warn(i.pos, "Could not inline required method %s because %s.".format(i.method.originalName.decode, reason))
-              }
-            }
+        def warnNoInline(reason: String) = {
+          if (shouldWarn) {
+            warn(i.pos, "Could not inline required method %s because %s.".format(i.method.originalName.decode, reason))
+          }
+        }
 
         var isAvailable = icodes available concreteMethod.enclClass
 
@@ -378,20 +378,20 @@ abstract class Inliners extends SubComponent {
           isAvailable = icodes.load(concreteMethod.enclClass)
         }
 
-            def isCandidate = (
-                 isClosureClass(receiver)
-              || concreteMethod.isEffectivelyFinal
-              || receiver.isEffectivelyFinal
-            )
+        def isCandidate = (
+             isClosureClass(receiver)
+          || concreteMethod.isEffectivelyFinal
+          || receiver.isEffectivelyFinal
+        )
 
-            def isApply     = concreteMethod.name == nme.apply
+        def isApply     = concreteMethod.name == nme.apply
 
-            def isCountable = !(
-                 isClosureClass(receiver)
-              || isApply
-              || isMonadicMethod(concreteMethod)
-              || receiver.enclosingPackage == definitions.RuntimePackage
-            )   // only count non-closures
+        def isCountable = !(
+             isClosureClass(receiver)
+          || isApply
+          || isMonadicMethod(concreteMethod)
+          || receiver.enclosingPackage == definitions.RuntimePackage
+        )   // only count non-closures
 
         debuglog("Treating " + i
               + "\n\treceiver: " + receiver
@@ -1055,9 +1055,17 @@ abstract class Inliners extends SubComponent {
     }
 
     def lookupIMethod(meth: Symbol, receiver: Symbol): Option[IMethod] = {
-      def tryParent(sym: Symbol) = icodes icode sym flatMap (_ lookupMethod meth)
+      log("lookupIMethod(" + meth + ", " + receiver + ")")
+      def tryParent(sym: Symbol) = {
+        log("lookupIMethod: tryParent: " + sym)
+        val result = icodes icode sym flatMap (_ lookupMethod meth)
+        log("lookupIMethod: tryParent: " + sym + ": " + result)
+        result
+      }
 
-      (receiver.info.baseClasses.iterator map tryParent find (_.isDefined)).flatten
+      val result = (receiver.info.baseClasses.iterator map tryParent find (_.isDefined)).flatten
+      log("lookupIMethod(" + meth + ", " + receiver + ") => " + result)
+      result
     }
   } /* class Inliner */
 } /* class Inliners */

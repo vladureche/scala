@@ -59,6 +59,8 @@ abstract class ICodeReader extends ClassfileParser {
     else super.getOwner(jflags)
 
   override def parseClass() {
+    debuglog("parseClass: instance = " + clazz)
+    debuglog("parseClass: module = " + staticModule)
     this.instanceCode = new IClass(clazz)
     this.staticCode   = new IClass(staticModule)
     val jflags = in.nextChar
@@ -90,28 +92,37 @@ abstract class ICodeReader extends ClassfileParser {
     val owner    = getOwner(jflags)
     val dummySym = owner.newMethod(name, owner.pos, toScalaMethodFlags(jflags))
 
+    log("parseMember: Looking for " + name + " in " + owner)
+    log(owner.info)
+
     try {
+      log("parseMember: Inside try")
       val ch  = in.nextChar
       val tpe = pool.getType(dummySym, ch)
+      log("parseMember: Got type: " + tpe)
 
       if ("<clinit>" == name.toString)
         (jflags, NoSymbol)
       else {
         val owner = getOwner(jflags)
         var sym = owner.info.findMember(name, 0, 0, false).suchThat(old => sameType(old.tpe, tpe))
+        log("parseMember: Looking for member with name " + name + " and type " + tpe)
         if (sym == NoSymbol)
           sym = owner.info.findMember(newTermName(name + nme.LOCAL_SUFFIX_STRING), 0, 0, false).suchThat(_.tpe =:= tpe)
         if (sym == NoSymbol) {
-          log("Could not find symbol for " + name + ": " + tpe)
+          log("parseMember: Could not find symbol for " + name + ": " + tpe)
           log(owner.info.member(name).tpe + " : " + tpe)
           sym = if (field) owner.newValue(name, owner.pos, toScalaFieldFlags(jflags)) else dummySym
           sym setInfoAndEnter tpe
-          log("added " + sym + ": " + sym.tpe)
+          log("parseMember: added " + sym + ": " + sym.tpe)
         }
+        log("parseMember: Result for " + name + " => " + sym)
         (jflags, sym)
       }
     } catch {
       case e: MissingRequirementError =>
+        log("parseMember: failed")
+        e.printStackTrace
         (jflags, NoSymbol)
     }
   }
@@ -128,18 +139,25 @@ abstract class ICodeReader extends ClassfileParser {
       tp1 =:= tp2
   }
 
-  override def parseMethod() {
+  override def parseMethod():Unit = {
     val (jflags, sym) = parseMember(false)
+    log("parseMethod: started for " + sym)
     var beginning = in.bp
     try {
-      if (sym != NoSymbol) {
+      if (sym != NoSymbol && sym.tpe.resultType != NoType) {
+        log("parseMethod: no-noSymbol")
         this.method = new IMethod(sym)
         this.method.returnType = toTypeKind(sym.tpe.resultType)
-        getCode(jflags).addMethod(this.method)
+        val to = getCode(jflags)
+        log("parseMethod: to = " + to.symbol)
+        to.addMethod(this.method)
+        log("parseMethod: to methods " + to.methods)
         if ((jflags & JAVA_ACC_NATIVE) != 0)
           this.method.native = true
         val attributeCount = in.nextChar
+        log("parseMethod: parse attributes")
         for (i <- 0 until attributeCount) parseAttribute()
+        log("parseMethod: finished")
       } else {
         debuglog("Skipping non-existent method.");
         skipAttributes();
@@ -163,26 +181,40 @@ abstract class ICodeReader extends ClassfileParser {
   }
 
   override def classNameToSymbol(name: Name) = {
-    val sym = if (name == fulltpnme.RuntimeNothing)
+    log("classNameToSymbol(" + name +")")
+    val sym = if (name == fulltpnme.RuntimeNothing) {
+      log("classNameToSymbol: found scala.Nothing")
       definitions.NothingClass
-    else if (name == fulltpnme.RuntimeNull)
+    } else if (name == fulltpnme.RuntimeNull) {
+      log("classNameToSymbol: found scala.Null")
       definitions.NullClass
-    else if (nme.isImplClassName(name)) {
-      val iface = rootMirror.getClassByName(tpnme.interfaceName(name))
-      log("forcing " + iface.owner + " at phase: " + phase + " impl: " + iface.implClass)
+    } else if (nme.isImplClassName(name)) {
+      log("classNameToSymbol: found implementation class")
+      val iface = rootMirror.staticClass(tpnme.interfaceName(name).toString)
+      log("classNameToSymbol: forcing " + iface.owner + " at phase: " + phase + " impl: " + iface.implClass)
+      println("classNameToSymbol: iface: " + iface)
       iface.owner.info // force the mixin type-transformer
-      rootMirror.getClassByName(name)
+      // broken, it's good that I didn't spend last night debugging for no reason
+      val result = beforeFlatten{ iface.implClass }
+      println("classNameToSymbol: impl: " + result)
+      result
     }
     else if (nme.isModuleName(name)) {
+      log("classNameToSymbol: found module name")
       val strippedName = nme.stripModuleSuffix(name)
-      val sym = forceMangledName(newTermName(strippedName.decode), true)
-
-      if (sym == NoSymbol) rootMirror.getModule(strippedName)
-      else sym
+      var sym = forceMangledName(newTermName(strippedName.decode), true)
+      log("classNameToSymbol: forced: " + sym)
+      sym = if (sym == NoSymbol) try { rootMirror.staticModule(strippedName.toString)  } catch { case _: MissingRequirementError => NoSymbol } else sym
+      log("classNameToSymbol: result: " + sym)
+      sym
     }
     else {
+      log("classNameToSymbol: found something else")
       forceMangledName(name, false)
-      afterFlatten(rootMirror.getClassByName(name.toTypeName))
+      log("classNameToSymbol: forced")
+      val result = try { afterFlatten(rootMirror.staticClass(name.toTypeName.toString)) } catch { case _: MissingRequirementError => NoSymbol }
+      log("classNameToSymbol: result: " + result)
+      result
     }
     if (sym.isModule)
       sym.moduleClass
@@ -640,7 +672,9 @@ abstract class ICodeReader extends ClassfileParser {
    *  There are two possible classes, the static part and the instance part.
    */
   def getCode(flags: Int): IClass =
-    if (isScalaModule) staticCode
+    if (instanceCode.symbol.isImplClass)
+      instanceCode
+    else if (isScalaModule) staticCode
     else if ((flags & JAVA_ACC_STATIC) != 0) staticCode
     else instanceCode
 

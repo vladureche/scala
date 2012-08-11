@@ -394,8 +394,9 @@ trait TypeKinds { self: ICodes =>
     // For sure WildcardTypes shouldn't reach here either, but when
     // debugging such situations this may come in handy.
     // case WildcardType                    => REFERENCE(ObjectClass)
-    case norm => abort(
-      "Unknown type: %s, %s [%s, %s] TypeRef? %s".format(
+    case norm =>
+      (new Exception()).printStackTrace
+      abort("Unknown type: %s, %s [%s, %s] TypeRef? %s".format(
         t, norm, t.getClass, norm.getClass, t.isInstanceOf[TypeRef]
       )
     )
