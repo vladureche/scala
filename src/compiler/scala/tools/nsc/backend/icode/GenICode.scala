@@ -20,10 +20,6 @@ import language.postfixOps
  *  @author  Iulian Dragos
  *  @version 1.0
  */
-object GenICode {
-  var s: scala.reflect.internal.Symbols#Symbol = _
-}
-
 abstract class GenICode extends SubComponent  {
   import global._
   import icodes._
@@ -905,11 +901,8 @@ abstract class GenICode extends SubComponent  {
             ctx
           }
 
-        case app @ Apply(fun1, args1) =>
-          // we might decide to change these later
-          var fun = fun1
-          var args = args1
-          var sym = fun.symbol
+        case app @ Apply(fun, args) =>
+          val sym = fun.symbol
 
           if (sym.isLabel) {  // jump to a label
             val label = ctx.labels.getOrElse(sym, {
@@ -940,103 +933,6 @@ abstract class GenICode extends SubComponent  {
             newCtx
           } else {  // normal method call
             debuglog("Gen CALL_METHOD with sym: " + sym + " isStaticSymbol: " + sym.isStaticMember);
-
-            // Inlining methods in traits:
-            //
-            // Traits consist of interfaces and implementation classes. A class that inherits from a trait will actually
-            // implement the interface and unless it overrides the member, will get a forwarder to the implementation
-            // class like this:
-            //  class FooImpl extends Object with Foo {
-            //    @scala.this.inline <method> final <existential/mixedin> <triedcooking> def foo(x: Int): Unit = Foo$class.foo(FooImpl.this, x);
-            //    ...
-            //  };
-            // If in the signature we get a trait, we get a java interface, thus any call to the trait's methods is
-            // translated to a call to the interface, and the inliner has no implementation to inline.
-            //
-            // So, if a trait has a final method and that final method has an implementation in the implementation class
-            // we want to avoid the call through the interface, which prevents the inliner from inlining the call. We do
-            // this by rewriting the call to target the implementation class instead of the interface.
-            //
-            // We only do this if the method is final and marked with @inline
-            fun match {
-              case Select(qual, _) if (settings.inline.value) && { // long condition coming:
-                                        GenICode.s=qual.symbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol]
-                                        val qualSym = findHostClass(qual.tpe, sym)
-                                        sym.isFinal && sym.hasAnnotation(definitions.ScalaInlineClass) &&
-                                        qualSym.isTrait &&
-                                        (qualSym.implClass != NoSymbol) } =>
-
-                // some functions we need to locate the implementation of the abstract method:
-                /** Compare two types and indicate that */
-                def typeEquals(t1: Type, t2: Type): Boolean = {
-                  if (t1.typeSymbol == definitions.ArrayClass && t2.typeSymbol == definitions.ArrayClass)
-                    (t1.typeArgs.length == t2.typeArgs.length) &&
-                    ((t1.typeArgs zip t2.typeArgs) forall { case (t1, t2) => typeEquals(t1, t2) })
-                  else
-                    t1.typeSymbol == t2.typeSymbol
-                }
-
-                /** Compare the signatures of the trait method and the implementation method */
-                def matches(recvSym: Symbol, mth: Symbol, implem: Symbol): Boolean = {
-                  implem.tpe match {
-                    case MethodType(params, returnType) if params.length == mth.paramss.flatten.length + 1 =>
-                      !params.isEmpty &&
-                      // note this comparison is done before erasure, as we might have self types
-                      beforeErasure(recvSym.typeOfThis <:< params.head.tpe) &&
-                      typeEquals(returnType, sym.info.resultType) &&
-                      (params.tail.map(_.tpe) zip mth.paramss.flatten.map(_.tpe) forall { case (t1, t2) => typeEquals(t1, t2) })
-                    case _ => false
-                  }
-                }
-
-
-                val qualSym = findHostClass(qual.tpe, sym) // the symbol of the qualifier
-                // implementation class corresponding to the trait
-                // why beforeFlatten? well, if the trait's info hasn't been forced by this time, the actual 
-                // implementation class will be added to an old version of the scope, before flatten has gotten a chance
-                // to duplicate the scope. Thus we need to look at the old scope, as there is the place we'll find the
-                // correct symbol. If we look at the current symbol, we'll see the Classloader-created symbol, which
-                // doesn't have the desired symbol
-                var implClass = beforeFlatten(qualSym.implClass)
-                // look for the implementation method
-                val implMethodOpt: Option[Symbol] = {
-                  implClass.info.member(sym.name) match {
-                    case NoSymbol => None                                    // no symbol
-                    case impl if matches(qualSym, sym, impl) => Some(impl)   // one symbol found
-                    case impl =>                                             // multiple alternatives
-                      impl.info match {
-                        case OverloadedType(owner, alternatives) =>
-                          alternatives.find(matches(qualSym, sym, _))
-                        case _ =>
-                          None
-                      }
-                  }
-                }
-
-                // if we found the implementation method, create another tree that calls it
-                if (implMethodOpt.isDefined) {
-                  val implMethod = implMethodOpt.get
-                  var qualifier = mkAttributedQualifier(implClass.tpe, implClass)
-                  // we need a cast here in case of self types
-                  val adaptedQualifier = {
-                    val actualType = qual.tpe
-                    val expectedType = implMethod.tpe.params.head.tpe
-                    if (!typeEquals(actualType, expectedType))
-                      global.gen.mkAsInstanceOf(qual, expectedType, any=false, wrapInApply=true)
-                    else
-                      qual
-                  }
-                  global.gen.mkMethodCall(qualifier, implMethod, Nil, adaptedQualifier::args) match {
-                    case Apply(fun2, args2) =>
-                      fun = fun2
-                      args = args2
-                      sym = fun2.symbol
-                  }
-                } else
-                  unit.inlinerWarning(tree.pos, "Trait inlining: Could not indentify member " + sym.name + " in the implementation class " + qualSym.implClass + ".")
-              case _ =>
-            }
-
             val invokeStyle =
               if (sym.isStaticMember)
                 Static(false)

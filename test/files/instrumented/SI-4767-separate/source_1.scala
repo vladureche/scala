@@ -1,5 +1,11 @@
 package instrumented
 
-trait A {
-  @inline final def foo() = println("hello from A")  
+/** Foo is a trait with a final method, that could be inlined */
+trait Foo {
+  @inline final def foo[T](x: T): Unit = println(x.toString)
+  @inline final def foo(x: Int): Unit = println(x)
+  @inline final def foo(x: Array[Int]): Unit = println(x.length)
+  @inline final def foo(x: Array[String]): Unit = println(x.length)
 }
+
+class Gândacel { override def toString = "Gândacel" } // = bug (in Romanian) 
