@@ -991,7 +991,13 @@ abstract class GenICode extends SubComponent  {
 
 
                 val qualSym = findHostClass(qual.tpe, sym) // the symbol of the qualifier
-                val implClass = qualSym.implClass          // implementation class corresponding to the trait
+                // implementation class corresponding to the trait
+                // why beforeFlatten? well, if the trait's info hasn't been forced by this time, the actual 
+                // implementation class will be added to an old version of the scope, before flatten has gotten a chance
+                // to duplicate the scope. Thus we need to look at the old scope, as there is the place we'll find the
+                // correct symbol. If we look at the current symbol, we'll see the Classloader-created symbol, which
+                // doesn't have the desired symbol
+                var implClass = beforeFlatten(qualSym.implClass)
                 // look for the implementation method
                 val implMethodOpt: Option[Symbol] = {
                   implClass.info.member(sym.name) match {

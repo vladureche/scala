@@ -1,4 +1,0 @@
-source_2.scala:4: error: Trait inlining: Could not indentify member foo in the implementation class class A$class.
-  def bar(a: A) = a.foo
-                    ^
-one error found
