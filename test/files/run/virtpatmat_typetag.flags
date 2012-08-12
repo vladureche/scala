@@ -1,1 +1,1 @@
--Xfatal-warnings
+-optimize -Yinline-warnings -Xfatal-warnings
