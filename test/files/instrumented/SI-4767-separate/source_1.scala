@@ -8,4 +8,4 @@ trait Foo {
   @inline final def foo(x: Array[String]): Unit = println(x.length)
 }
 
-class Gândăcel { override def toString = "Gândacel" } // = bug (in Romanian) 
+class Gândăcel { override def toString = "Gândăcel" } // = bug (in Romanian) 

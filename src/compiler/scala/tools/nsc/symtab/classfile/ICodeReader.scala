@@ -180,10 +180,10 @@ abstract class ICodeReader extends ClassfileParser {
 
   override def classNameToSymbol(name: Name) = {
     debuglog("classNameToSymbol(" + name +")")
-    val sym = if (name == fulltpnme.RuntimeNothing) {
+    val sym = if (name.toString == fulltpnme.RuntimeNothing.toString) {
       debuglog("classNameToSymbol: found scala.Nothing")
       definitions.NothingClass
-    } else if (name == fulltpnme.RuntimeNull) {
+    } else if (name.toString == fulltpnme.RuntimeNull.toString) {
       debuglog("classNameToSymbol: found scala.Null")
       definitions.NullClass
     } else if (nme.isImplClassName(name)) {
