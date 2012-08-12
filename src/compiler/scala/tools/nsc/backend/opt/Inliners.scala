@@ -105,6 +105,12 @@ abstract class Inliners extends SubComponent {
   /** Create a new phase */
   override def newPhase(p: Phase) = new InliningPhase(p)
 
+  /** The total instructions inlined */
+  var inlinedInsts = 0
+
+  /** The total methods inlined */
+  var inlinedMths = 0
+
   /** The Inlining phase.
    */
   class InliningPhase(prev: Phase) extends ICodePhase(prev) {
@@ -132,8 +138,11 @@ abstract class Inliners extends SubComponent {
       knownLacksInline.clear()
       knownHasInline.clear()
       try {
+        inlinedInsts = 0
+        inlinedMths = 0
         super.run()
         for(c <- queue) { inliner analyzeClass c }
+        println(inlinedMths + " methods inlined, with a total of " + inlinedInsts + " instructions.") 
       } finally {
         inliner.clearCaches()
         knownLacksInline.clear()
@@ -149,17 +158,9 @@ abstract class Inliners extends SubComponent {
   def isClosureClass(cls: Symbol): Boolean =
     cls.isFinal && cls.isSynthetic && !cls.isModuleClass && cls.isAnonymousFunction
 
-  /*
-      TODO now that Inliner runs faster we could consider additional "monadic methods" (in the limit, all those taking a closure as last arg)
-      Any "monadic method" occurring in a given caller C that is not `isMonadicMethod()` will prevent CloseElim from eliminating
-      any anonymous-closure-class any whose instances are given as argument to C invocations.
-   */
-  def isMonadicMethod(sym: Symbol) = {
-    nme.unspecializedName(sym.name) match {
-      case nme.foreach | nme.filter | nme.withFilter | nme.map | nme.flatMap => true
-      case _                                                                 => false
-    }
-  }
+  /* Using the real definition of monadic methods - they take a Function0 or Function1 parameter */
+  def isMonadicMethod(sym: Symbol) =
+    sym.info.params.exists(arg => (arg.tpe.typeSymbol == definitions.FunctionClass(0)) || (arg.tpe.typeSymbol == definitions.FunctionClass(1)))
 
   val knownLacksInline = mutable.Set.empty[Symbol] // cache to avoid multiple inliner.hasInline() calls.
   val knownHasInline   = mutable.Set.empty[Symbol] // as above. Motivated by the need to warn on "inliner failures".
@@ -661,9 +662,9 @@ abstract class Inliners extends SubComponent {
          *
          * TODO handle more robustly the case of a trait var changed at the source-level from public to private[this]
          *      (eg by having ICodeReader use unpickler, see SI-5442).
-         
+
          DISABLED
-         
+
         def potentiallyPublicized(f: Symbol): Boolean = {
           (m.sourceFile eq NoSourceFile) && f.name.containsChar('$')
         }
@@ -844,7 +845,7 @@ abstract class Inliners extends SubComponent {
             i
           }
           def isInlined(l: Local) = inlinedLocals isDefinedAt l
-
+          inlinedInsts += 1
           val newInstr = i match {
             case THIS(clasz)                    => LOAD_LOCAL(inlinedThis.get)  // if inlinedThis is None, it means we're
             case STORE_THIS(_)                  => STORE_LOCAL(inlinedThis.get) // in a static call, so no THIS/STORE_THIS
@@ -875,6 +876,7 @@ abstract class Inliners extends SubComponent {
           newInstr
         }
 
+        inlinedMths += 1
         caller addLocals (inc.locals map dupLocal)
         if (inlinedThis.isDefined)
           caller addLocal inlinedThis.get
@@ -941,6 +943,14 @@ abstract class Inliners extends SubComponent {
 
         if(tfa.blackballed(inc.sym)) { return NeverSafeToInline }
 
+        // TODO: these are tailcalls-transformed methods that reference THIS and became static after mixin -- we can't
+        // inline them because we don't have the mechanism to bridge calls to THIS and STORE_THIS to the first argument
+        if ((inc.m.symbol.hasFlag(Flags.STATIC) || inc.m.symbol.owner.isImplClass) &&
+          inc.instructions.exists((instr: Instruction) => instr.isInstanceOf[THIS] || instr.isInstanceOf[STORE_THIS])) {
+          log("Inliner: prevented inlining of tailcalls-transformed static " + inc.m.symbol + " (this is a technical limitation)")
+          return NeverSafeToInline
+        }
+
         if(!isKnownToInlineSafely) {
 
           if(inc.openBlocks.nonEmpty) {
@@ -983,6 +993,34 @@ abstract class Inliners extends SubComponent {
          *         while having a top-level finalizer (see liftedTry problem)
          * As a result of (b), some synthetic private members can be chosen to become public.
          */
+        // TODO: Add stack limit in Inliners
+        // if you replace the isScoreOkay to be always true in Inliners.scala and compile 
+        // src/reflect/scala/reflect/internal/Types.scala you'll notice a crash in ASM:
+        // stacktrace:
+        //  uncaught exception during compilation: java.lang.NegativeArraySizeException
+        //  error: java.lang.NegativeArraySizeException
+        //    at scala.tools.asm.Frame.merge(Unknown Source)
+        //    at scala.tools.asm.MethodWriter.visitMaxs(Unknown Source)
+        //    at scala.tools.nsc.backend.jvm.GenASM$JPlainBuilder.genMethod(GenASM.scala:1635)
+        //    at scala.tools.nsc.backend.jvm.GenASM$JPlainBuilder$$anonfun$genClass$5.apply(GenASM.scala:1463)
+        //    at scala.tools.nsc.backend.jvm.GenASM$JPlainBuilder$$anonfun$genClass$5.apply(GenASM.scala:1463)
+        //    at scala.collection.LinearSeqOptimized$class.foreach(LinearSeqOptimized.scala:59)
+        //    at scala.collection.immutable.List.foreach(List.scala:78)
+        //    at scala.tools.nsc.backend.jvm.GenASM$JPlainBuilder.genClass(GenASM.scala:1463)
+        //    at scala.tools.nsc.backend.jvm.GenASM$AsmPhase.run(GenASM.scala:180)
+        //    at scala.tools.nsc.Global$Run.compileUnitsInternal(Global.scala:1576)
+        //    at scala.tools.nsc.Global$Run.compileUnits(Global.scala:1550)
+        //    at scala.tools.nsc.Global$Run.compileSources(Global.scala:1546)
+        //    at scala.tools.nsc.Global$Run.compile(Global.scala:1656)
+        //    at scala.tools.nsc.Driver.doCompile(Driver.scala:33)
+        //    at scala.tools.nsc.Main$.doCompile(Main.scala:79)
+        //    at scala.tools.nsc.Driver.process(Driver.scala:54)
+        //    at scala.tools.nsc.Driver.main(Driver.scala:67)
+        //    at scala.tools.nsc.Main.main(Main.scala)
+        // the explanation:
+        // $ java -cp ../../build/pack/lib/scala-library.jar:classes 'scala.reflect.internal.Types$ConstantType$'
+        // Exception in thread "main" java.lang.VerifyError: (class: scala/reflect/internal/Types$ConstantType$, method: overwrite$1 signature: (ILscala/reflect/internal/Types$Type;[Ljava/lang/Object;)V) Stack size too large
+        // Could not find the main class: scala.reflect.internal.Types$ConstantType$.  Program will exit.
 
         if(!isInlineForced && !isScoreOK) {
           // During inlining retry, a previous caller-callee pair that scored low may pass.
