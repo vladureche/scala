@@ -96,8 +96,8 @@ abstract class Inliners extends SubComponent {
   /** The large size in basic blocks of methods considered for inlining. */
   final val MAX_INLINE_SIZE = 16
 
-  /** The maximum size in basic blocks of methods considered for inlining. */
-  final val XXL_INLINE_SIZE = 25
+  /** The maximum size in instructions of methods considered for inlining. */
+  final val MAX_INSTRUCTION_SIZE = 500
 
   /** Maximum loop iterations. */
   final val MAX_INLINE_RETRY = 15
@@ -632,7 +632,7 @@ abstract class Inliners extends SubComponent {
 
       def isSmall       = (length <= SMALL_METHOD_SIZE) && blocks(0).length < 10
       def isLarge       = length > MAX_INLINE_SIZE
-      def isExtraLarge  = length > XXL_INLINE_SIZE
+      def isExtraLarge  = instructions.length > MAX_INSTRUCTION_SIZE
       def isRecursive   = m.recursive
       def hasHandlers   = handlers.nonEmpty || m.bytecodeHasEHs
 
@@ -1097,6 +1097,7 @@ abstract class Inliners extends SubComponent {
         if (caller.isInClosure)           score -= 2
         else if (caller.inlinedCalls < 1) score -= 1 // only monadic methods can trigger the first inline
 
+        if (inc.m.symbol.isStatic) score -= -1; // don't be too eager to inline static methods
         if (inc.isSmall) score += 1;
         if (inc.isLarge) score -= 1;
         // Remember scala.collection.immutable.Stream? Well, that would inline forever otherwise:
@@ -1106,8 +1107,8 @@ abstract class Inliners extends SubComponent {
           debuglog("shouldInline: score decreased to " + score + " because small " + caller + " would become large")
         }
 
-        if (inc.isMonadic)          score += 3
-        else if (inc.isHigherOrder) score += 1
+        if (inc.isMonadic)          score += 4
+        else if (inc.isHigherOrder) score += 3
 
         if (inc.isInClosure)                 score += 2;
         if (inlinedMethodCount(inc.sym) > 2) score -= 2;
