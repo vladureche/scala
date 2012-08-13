@@ -875,7 +875,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
      *   - otherwise the signature in question
      */
     def getGenericSignature(sym: Symbol, owner: Symbol): String = {
-
+      println(sym + " (in " + sym.owner + ") => " + needsGenericSignature(sym))
       if (!needsGenericSignature(sym)) { return null }
 
       val memberTpe = enteringErasure(owner.thisType.memberInfo(sym))
