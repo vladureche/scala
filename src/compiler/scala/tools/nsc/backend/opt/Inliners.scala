@@ -145,7 +145,7 @@ abstract class Inliners extends SubComponent {
         inlinedMths = 0
         super.run()
         for(c <- queue) { inliner analyzeClass c }
-        println(inlinedMths + " methods inlined, with a total of " + inlinedInsts + " instructions.")
+        log(inlinedMths + " methods inlined, with a total of " + inlinedInsts + " instructions.")
       } finally {
         inliner.clearCaches()
         knownLacksInline.clear()
@@ -161,9 +161,17 @@ abstract class Inliners extends SubComponent {
   def isClosureClass(cls: Symbol): Boolean =
     cls.isFinal && cls.isSynthetic && !cls.isModuleClass && cls.isAnonymousFunction
 
-  /* Using the real definition of monadic methods - they take a Function0 or Function1 parameter */
-  def isMonadicMethod(sym: Symbol) =
-    sym.info.params.exists(arg => (arg.tpe.typeSymbol == definitions.FunctionClass(0)) || (arg.tpe.typeSymbol == definitions.FunctionClass(1)))
+  /*
+      TODO now that Inliner runs faster we could consider additional "monadic methods" (in the limit, all those taking a closure as last arg)
+      Any "monadic method" occurring in a given caller C that is not `isMonadicMethod()` will prevent CloseElim from eliminating
+      any anonymous-closure-class any whose instances are given as argument to C invocations.
+   */
+  def isMonadicMethod(sym: Symbol) = {
+    nme.unspecializedName(sym.name) match {
+      case nme.foreach | nme.filter | nme.withFilter | nme.map | nme.flatMap => true
+      case _                                                                 => false
+    }
+  }
 
   val knownLacksInline = mutable.Set.empty[Symbol] // cache to avoid multiple inliner.hasInline() calls.
   val knownHasInline   = mutable.Set.empty[Symbol] // as above. Motivated by the need to warn on "inliner failures".
@@ -1092,7 +1100,7 @@ abstract class Inliners extends SubComponent {
         if (inc.isSmall) score += 1;
         if (inc.isLarge) score -= 1;
         // Remember scala.collection.immutable.Stream? Well, that would inline forever otherwise:
-        //if (inc.isExtraLarge || caller.isExtraLarge) score -= 100;
+        if (inc.isExtraLarge || caller.isExtraLarge) score -= 100;
         if (caller.isSmall && isLargeSum) {
           score -= 1
           debuglog("shouldInline: score decreased to " + score + " because small " + caller + " would become large")
