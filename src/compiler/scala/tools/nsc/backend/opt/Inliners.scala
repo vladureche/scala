@@ -97,7 +97,7 @@ abstract class Inliners extends SubComponent {
   final val MAX_INLINE_SIZE = 16
 
   /** The maximum size in basic blocks of methods considered for inlining. */
-  final val XXL_INLINE_SIZE = 25
+  final val MAX_INSTRUCTION_SIZE = 1000
 
   /** Maximum loop iterations. */
   final val MAX_INLINE_RETRY = 15
@@ -161,9 +161,17 @@ abstract class Inliners extends SubComponent {
   def isClosureClass(cls: Symbol): Boolean =
     cls.isFinal && cls.isSynthetic && !cls.isModuleClass && cls.isAnonymousFunction
 
-  /* Using the real definition of monadic methods - they take a Function0 or Function1 parameter */
-  def isMonadicMethod(sym: Symbol) =
-    sym.info.params.exists(arg => (arg.tpe.typeSymbol == definitions.FunctionClass(0)) || (arg.tpe.typeSymbol == definitions.FunctionClass(1)))
+  /*
+      TODO now that Inliner runs faster we could consider additional "monadic methods" (in the limit, all those taking a closure as last arg)
+      Any "monadic method" occurring in a given caller C that is not `isMonadicMethod()` will prevent CloseElim from eliminating
+      any anonymous-closure-class any whose instances are given as argument to C invocations.
+   */
+  def isMonadicMethod(sym: Symbol) = {
+    nme.unspecializedName(sym.name) match {
+      case nme.foreach | nme.filter | nme.withFilter | nme.map | nme.flatMap => true
+      case _                                                                 => false
+    }
+  }
 
   val knownLacksInline = mutable.Set.empty[Symbol] // cache to avoid multiple inliner.hasInline() calls.
   val knownHasInline   = mutable.Set.empty[Symbol] // as above. Motivated by the need to warn on "inliner failures".
@@ -624,7 +632,7 @@ abstract class Inliners extends SubComponent {
 
       def isSmall       = (length <= SMALL_METHOD_SIZE) && blocks(0).length < 10
       def isLarge       = length > MAX_INLINE_SIZE
-      def isExtraLarge  = length > XXL_INLINE_SIZE
+      def isExtraLarge  = m.code.instructions.length > MAX_INSTRUCTION_SIZE
       def isRecursive   = m.recursive
       def hasHandlers   = handlers.nonEmpty || m.bytecodeHasEHs
 
@@ -1083,28 +1091,28 @@ abstract class Inliners extends SubComponent {
       def isScoreOK: Boolean = {
         debuglog("shouldInline: " + caller.m + " , callee:" + inc.m)
 
-        var score = 0
+        def table: List[(String, Boolean, Int)] = List(
+          ("[caller] inlined methods > 2", inlinedMethodCount(inc.sym) > 2, -1),
+          ("[caller] isInClosure        ", caller.isInClosure, -2),
+          ("[caller] would become large ", caller.isSmall && isLargeSum, -1),
+          ("[any] isExtraLarge          ", inc.isExtraLarge || caller.isExtraLarge, -10), // Remember scala.collection.immutable.Stream? Well, that would inline forever otherwise:
+          ("[callee] isSmall            ", inc.isSmall, 1),
+          ("[callee] isLarge            ", inc.isSmall, -1),
+          ("[callee] @inline            ", inc.m.symbol.hasAnnotation(ScalaInlineClass), 2),
+          ("[callee] isMonadic          ", inc.isMonadic, 2),
+          ("[callee] isHigherOrder      ", inc.isHigherOrder, 3),
+          ("[callee] isApply            ", (nme.unspecializedName(inc.m.symbol.name) == nme.apply), 2),
+          ("[callee] isInClosure        ", inc.isInClosure, 2))
 
-        // better not inline inside closures, but hope that the closure itself is repeatedly inlined
-        if (caller.isInClosure)           score -= 2
-        else if (caller.inlinedCalls < 1) score -= 1 // only monadic methods can trigger the first inline
-
-        if (inc.isSmall) score += 1;
-        if (inc.isLarge) score -= 1;
-        // Remember scala.collection.immutable.Stream? Well, that would inline forever otherwise:
-        //if (inc.isExtraLarge || caller.isExtraLarge) score -= 100;
-        if (caller.isSmall && isLargeSum) {
-          score -= 1
-          debuglog("shouldInline: score decreased to " + score + " because small " + caller + " would become large")
-        }
-
-        if (inc.isMonadic)          score += 3
-        else if (inc.isHigherOrder) score += 1
-
-        if (inc.isInClosure)                 score += 2;
-        if (inlinedMethodCount(inc.sym) > 2) score -= 2;
-
+        val score = table.foldLeft(0)((score, tuple) => if (tuple._2) score + tuple._3 else score)
         log("shouldInline(" + inc.m + ") score: " + score)
+
+        if (inc.owner.isAnonymousFunction && score < 0) {
+          log("closure not inlined: " + inc.m + " in " + caller.m)
+          for ((label, status, value) <- table)
+            log("  " + label + "  " + (if(status) value else 0) + " / " + value)
+          log("  score: " + score)
+        }
 
         score > 0
       }
