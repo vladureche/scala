@@ -93,8 +93,11 @@ abstract class Inliners extends SubComponent {
   /* A warning threshold */
   private final val MAX_INLINE_MILLIS = 2000
 
-  /** The maximum size in basic blocks of methods considered for inlining. */
+  /** The large size in basic blocks of methods considered for inlining. */
   final val MAX_INLINE_SIZE = 16
+
+  /** The maximum size in basic blocks of methods considered for inlining. */
+  final val XXL_INLINE_SIZE = 25
 
   /** Maximum loop iterations. */
   final val MAX_INLINE_RETRY = 15
@@ -142,7 +145,7 @@ abstract class Inliners extends SubComponent {
         inlinedMths = 0
         super.run()
         for(c <- queue) { inliner analyzeClass c }
-        println(inlinedMths + " methods inlined, with a total of " + inlinedInsts + " instructions.") 
+        println(inlinedMths + " methods inlined, with a total of " + inlinedInsts + " instructions.")
       } finally {
         inliner.clearCaches()
         knownLacksInline.clear()
@@ -258,7 +261,7 @@ abstract class Inliners extends SubComponent {
         }
       }
 
-    val tfa   = new analysis.MTFAGrowable()
+    var tfa   = new analysis.MTFAGrowable()
     tfa.stat  = global.opt.printStats
     val staleOut      = new mutable.ListBuffer[BasicBlock]
     val splicedBlocks = mutable.Set.empty[BasicBlock]
@@ -297,6 +300,10 @@ abstract class Inliners extends SubComponent {
      * */
     def analyzeMethod(m: IMethod): Unit = {
       // m.normalize
+
+      // reinitialize the tfa instance so the old one can be GC'd -- otherwise garbage will gather in the "in" and "out"
+      // maps, leading to a crash
+      tfa = new analysis.MTFAGrowable()
 
       var sizeBeforeInlining  = m.code.blockCount
       var instrBeforeInlining = m.code.instructionCount
@@ -486,6 +493,12 @@ abstract class Inliners extends SubComponent {
 
       do {
         retry = false
+
+        // In case you need to print the icode at each step, here's the code:
+        // val printer = new icodes.TextPrinter(null, icodes.linearizer)
+        // printer.setWriter(new java.io.PrintWriter(System.out, true))
+        // printer.printMethod(caller.m)
+
         log("Analyzing " + m + " count " + count + " with " + caller.length + " blocks")
 
         /* it's important not to inline in unreachable basic blocks. linearizedBlocks() returns only reachable ones. */
@@ -611,6 +624,7 @@ abstract class Inliners extends SubComponent {
 
       def isSmall       = (length <= SMALL_METHOD_SIZE) && blocks(0).length < 10
       def isLarge       = length > MAX_INLINE_SIZE
+      def isExtraLarge  = length > XXL_INLINE_SIZE
       def isRecursive   = m.recursive
       def hasHandlers   = handlers.nonEmpty || m.bytecodeHasEHs
 
@@ -994,7 +1008,7 @@ abstract class Inliners extends SubComponent {
          * As a result of (b), some synthetic private members can be chosen to become public.
          */
         // TODO: Add stack limit in Inliners
-        // if you replace the isScoreOkay to be always true in Inliners.scala and compile 
+        // if you replace the isScoreOkay to be always true in Inliners.scala and compile
         // src/reflect/scala/reflect/internal/Types.scala you'll notice a crash in ASM:
         // stacktrace:
         //  uncaught exception during compilation: java.lang.NegativeArraySizeException
@@ -1077,6 +1091,8 @@ abstract class Inliners extends SubComponent {
 
         if (inc.isSmall) score += 1;
         if (inc.isLarge) score -= 1;
+        // Remember scala.collection.immutable.Stream? Well, that would inline forever otherwise:
+        //if (inc.isExtraLarge || caller.isExtraLarge) score -= 100;
         if (caller.isSmall && isLargeSum) {
           score -= 1
           debuglog("shouldInline: score decreased to " + score + " because small " + caller + " would become large")
