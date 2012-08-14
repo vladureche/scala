@@ -1460,7 +1460,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       }
 
       clasz.fields  foreach genField
-      clasz.methods foreach { im => genMethod(im, c.symbol.isInterface) }
+      clasz.methods foreach { im => genMethod(im, c, c.symbol.isInterface) }
 
       addInnerClasses(clasz.symbol, jclass)
       jclass.visitEnd()
@@ -1535,7 +1535,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
     @inline final def emit(opc: Int) { jmethod.visitInsn(opc) }
 
-    def genMethod(m: IMethod, isJInterface: Boolean) {
+    def genMethod(m: IMethod, c: IClass, isJInterface: Boolean) {
 
         def isClosureApply(sym: Symbol): Boolean = {
           (sym.name == nme.apply) &&
@@ -1627,11 +1627,25 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
         val hasStaticBitSet = ((flags & asm.Opcodes.ACC_STATIC) != 0)
         genCode(m, emitVars, hasStaticBitSet)
 
-        jmethod.visitMaxs(0, 0) // just to follow protocol, dummy arguments
+        try {
+          jmethod.visitMaxs(0, 0) // just to follow protocol, dummy arguments
+        } catch {
+          case _: Throwable =>
+            import icodes._
+
+            println("ASM error in method " + m.symbol + " in " + c.symbol + ": ")
+            val printer = new icodes.TextPrinter(null, icodes.linearizer)
+            printer.setWriter(new java.io.PrintWriter(System.out, true))
+            printer.printMethod(m)
+            try {
+              new icodeCheckers.ICodeChecker() check c
+            } catch {
+              case e: Exception => println(e.getMessage)
+            }
+        }
       }
 
       jmethod.visitEnd()
-
     }
 
     def addModuleInstanceField() {

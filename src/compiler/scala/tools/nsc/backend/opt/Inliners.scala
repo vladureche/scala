@@ -435,6 +435,13 @@ abstract class Inliners extends SubComponent {
                    if (isCountable) { count += 1 };
 
                    pair.doInline(bb, i)
+
+                   if (caller.m.symbol.nameString=="f") {
+                     val printer = new icodes.TextPrinter(null, icodes.linearizer)
+                     printer.setWriter(new java.io.PrintWriter(System.out, true))
+                     printer.printMethod(caller.m)
+                   }
+
                    if (!pair.isInlineForced || inc.isMonadic) { caller.inlinedCalls += 1 };
                    inlinedMethodCount(inc.sym) += 1
 
@@ -661,9 +668,9 @@ abstract class Inliners extends SubComponent {
          *
          * TODO handle more robustly the case of a trait var changed at the source-level from public to private[this]
          *      (eg by having ICodeReader use unpickler, see SI-5442).
-         
+
          DISABLED
-         
+
         def potentiallyPublicized(f: Symbol): Boolean = {
           (m.sourceFile eq NoSourceFile) && f.name.containsChar('$')
         }

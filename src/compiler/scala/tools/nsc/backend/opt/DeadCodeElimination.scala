@@ -71,8 +71,14 @@ abstract class DeadCodeElimination extends SubComponent {
     /** Map instructions who have a drop on some control path, to that DROP instruction. */
     val dropOf: mutable.Map[(BasicBlock, Int), List[(BasicBlock, Int)]] = perRunCaches.newMap()
 
+    private val tfa: analysis.MethodTFA = new analysis.MethodTFA()
+    private var tfaCache: Map[Int, tfa.lattice.Elem] = Map.empty
+    private var analyzedMethod: IMethod = NoIMethod
+
     def dieCodeDie(m: IMethod) {
       if (m.hasCode) {
+        analyzedMethod = NoIMethod
+        tfaCache = Map.empty
         log("dead code elimination on " + m);
         dropOf.clear()
         m.code.blocks.clear()
@@ -80,6 +86,7 @@ abstract class DeadCodeElimination extends SubComponent {
         m.code.blocks ++= linearizer.linearize(m)
         collectRDef(m)
         mark
+        printMethod(m)
         sweep(m)
         accessedLocals = accessedLocals.distinct
         if ((m.locals diff accessedLocals).nonEmpty) {
@@ -209,13 +216,11 @@ abstract class DeadCodeElimination extends SubComponent {
       val compensations = computeCompensations(m)
 
       m foreachBlock { bb =>
-//        Console.println("** Sweeping block " + bb + " **")
         val oldInstr = bb.toList
         bb.open
         bb.clear
         for (Pair(i, idx) <- oldInstr.zipWithIndex) {
           if (useful(bb)(idx)) {
-//            log(" " + i + " is useful")
             bb.emit(i, i.pos)
             compensations.get(bb, idx) match {
               case Some(is) => is foreach bb.emit
@@ -251,6 +256,7 @@ abstract class DeadCodeElimination extends SubComponent {
         assert(bb.closed, "Open block in computeCompensations")
         foreachWithIndex(bb.toList) { (i, idx) =>
           if (!useful(bb)(idx)) {
+            log("!useful: " + i)
             foreachWithIndex(i.consumedTypes.reverse) { (consumedType, depth) =>
               log("Finding definitions of: " + i + "\n\t" + consumedType + " at depth: " + depth)
               val defs = rdef.findDefs(bb, idx, 1, depth)
@@ -300,5 +306,142 @@ abstract class DeadCodeElimination extends SubComponent {
     /** Is 'sym' a side-effecting method? TODO: proper analysis.  */
     private def isSideEffecting(sym: Symbol) = !isPure(sym)
 
+    private var margin = 0
+    private var out = new java.io.PrintWriter(System.out, true)
+
+    final val TAB = 2
+
+
+    def indent() { margin += TAB }
+    def undent() { margin -= TAB }
+
+    def print(s: String) { out.print(s) }
+    def print(o: Any) { print(o.toString()) }
+
+    def println(s: String) {
+      print(s);
+      println
+    }
+
+    def println() {
+      out.println()
+      var i = 0
+      while (i < margin) {
+        print(" ");
+        i += 1
+      }
+    }
+
+    def printList[A](l: List[A], sep: String): Unit = l match {
+      case Nil =>
+      case x :: Nil => print(x)
+      case x :: xs  => print(x); print(sep); printList(xs, sep)
+    }
+
+    def printList[A](pr: A => Unit)(l: List[A], sep: String): Unit = l match {
+      case Nil =>
+      case x :: Nil => pr(x)
+      case x :: xs  => pr(x); print(sep); printList(pr)(xs, sep)
+    }
+
+    def printClass(cls: IClass) {
+      print(cls.symbol.toString()); print(" extends ");
+      printList(cls.symbol.info.parents, ", ");
+      indent; println(" {");
+      println("// fields:");
+      cls.fields.foreach(printField); println;
+      println("// methods");
+      cls.methods.foreach(printMethod);
+      undent; println;
+      println("}")
+    }
+
+    def printField(f: IField) {
+      print(f.symbol.keyString); print(" ");
+      print(f.symbol.nameString); print(": ");
+      println(f.symbol.info.toString());
+    }
+
+    def printMethod(m: IMethod) {
+      print("def "); print(m.symbol.name);
+      print("("); printList(printParam)(m.params, ", "); print(")");
+      print(": "); print(m.symbol.info.resultType)
+
+      if (!m.isAbstractMethod) {
+        println(" {")
+        println("locals: " + m.locals.mkString("", ", ", ""))
+        println("startBlock: " + m.startBlock)
+        println("blocks: " + m.code.blocks.mkString("[", ",", "]"))
+        println
+        linearizer.linearize(m) foreach printBlock
+        println("}")
+
+        indent; println("Exception handlers: ")
+        m.exh foreach printExceptionHandler
+
+        undent; println
+      } else
+        println
+    }
+
+    def printParam(p: Local) {
+      print(p.sym.name); print(": "); print(p.sym.info);
+      print(" ("); print(p.kind); print(")")
+    }
+
+    def printExceptionHandler(e: ExceptionHandler) {
+      indent;
+      println("catch (" + e.cls.simpleName + ") in " + e.covered.toSeq.sortBy(_.label) + " starting at: " + e.startBlock);
+      println("consisting of blocks: " + e.blocks);
+      undent;
+      println("with finalizer: " + e.finalizer);
+    }
+
+    def printBlock(bb: BasicBlock) {
+      print(bb.label)
+      if (bb.loopHeader) print("[loop header]")
+      print(": ");
+      print("pred: " + bb.predecessors + " succs: " + bb.successors + " flags: " + bb.flagsString)
+      indent; println
+      bb.toList foreach ((i: Instruction) => printInstruction(bb, i))
+      undent; println
+    }
+
+    def printInstruction(bb: BasicBlock, i: Instruction) {
+      if (i.pos.isDefined) print(i.pos.line.toString + "\t") else print("?\t")
+      println("%-60s".format(i.toString()) + "  " + (if (useful(bb)(bb.indexOf(i))) "            " else "***remove***") + "        " + getTypesAtInstruction(bb, bb.indexOf(i)).reverse)
+    }
+
+    private def getTypesAtInstruction(bblock: BasicBlock, index: Int): List[TypeKind] = {
+      // get the stack at the block entry
+      var typeInfo = getTypesAtBlockEntry(bblock)
+
+      // perform tfa to the current instruction
+      for (i <- 0 to (index)) {
+        typeInfo = tfa.interpret(typeInfo, bblock(i))
+      }
+
+      // return the result
+      typeInfo.stack.types
+    }
+
+    /**
+      * Gets the stack at the block entry. Normally the typeFlowAnalysis should be run again, but we know how to compute
+      * the stack for handler duplicates. For the locals, it's safe to assume the info from the original handler is
+      * still valid (a more precise analysis can be done, but it's not necessary)
+      */
+    private def getTypesAtBlockEntry(bblock: BasicBlock): tfa.lattice.Elem = {
+      // lazily perform tfa, because it's expensive
+      // cache results by block label, as rewriting the code messes up the block's hashCode
+      if (analyzedMethod != bblock.method) {
+        analyzedMethod = bblock.method
+        tfa.init(bblock.method)
+        tfa.run
+
+        for (block <- bblock.method.blocks.sortBy(_.label))
+          tfaCache += block.label -> tfa.in(block)
+      }
+      tfaCache(bblock.label)
+    }
   } /* DeadCode */
 }
