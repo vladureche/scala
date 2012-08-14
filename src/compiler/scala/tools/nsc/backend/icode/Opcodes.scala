@@ -414,7 +414,7 @@ trait Opcodes { self: ICodes =>
       assert(boxType.isValueType && (boxType ne UNIT)) // documentation
       override def toString(): String = "BOX " + boxType
       override def consumed = 1
-      override def consumedTypes = boxType :: Nil
+      override def consumedTypes = List(boxType)
       override def produced = 1
       override def producedTypes = BOXED(boxType) :: Nil
       override def category = objsCat
@@ -477,7 +477,6 @@ trait Opcodes { self: ICodes =>
       override def produced = 1
       override def consumedTypes = ObjectReferenceList
       override def producedTypes = BOOL :: Nil
-
       override def category = castsCat
     }
 
@@ -575,7 +574,6 @@ trait Opcodes { self: ICodes =>
 
       override def consumed = 1
       override def produced = 0
-
       override def consumedTypes = kind :: Nil
       override def category = jumpsCat
     }
@@ -588,9 +586,7 @@ trait Opcodes { self: ICodes =>
     case class RETURN(kind: TypeKind) extends Instruction {
       override def consumed = if (kind == UNIT) 0 else 1
       override def produced = 0
-
       override def consumedTypes = if (kind == UNIT) Nil else kind :: Nil
-
       override def category = retCat
     }
 
@@ -607,9 +603,7 @@ trait Opcodes { self: ICodes =>
 
       override def consumed = 1
       override def produced = 0
-
       override def consumedTypes = toTypeKind(clasz.tpe) :: Nil
-
       override def category = retCat
     }
 
@@ -623,9 +617,7 @@ trait Opcodes { self: ICodes =>
 
       override def consumed = 1
       override def produced = 0
-
       override def consumedTypes = typ :: Nil
-
       override def category = stackCat
     }
 
@@ -651,9 +643,7 @@ trait Opcodes { self: ICodes =>
 
       override def consumed = 1
       override def produced = 0
-
-      override def consumedTypes = ObjectReference :: Nil
-
+      override def consumedTypes = ObjectReferenceList
       override def category = objsCat
     }
 
@@ -667,9 +657,7 @@ trait Opcodes { self: ICodes =>
 
       override def consumed = 1;
       override def produced = 0;
-
-      override def consumedTypes = ObjectReference :: Nil
-
+      override def consumedTypes = ObjectReferenceList
       override def category = objsCat
     }
 
