@@ -1097,7 +1097,6 @@ abstract class Inliners extends SubComponent {
         if (caller.isInClosure)           score -= 2
         else if (caller.inlinedCalls < 1) score -= 1 // only monadic methods can trigger the first inline
 
-        if (inc.m.symbol.isStatic) score -= -1; // don't be too eager to inline static methods
         if (inc.isSmall) score += 1;
         if (inc.isLarge) score -= 1;
         // Remember scala.collection.immutable.Stream? Well, that would inline forever otherwise:
@@ -1107,8 +1106,8 @@ abstract class Inliners extends SubComponent {
           debuglog("shouldInline: score decreased to " + score + " because small " + caller + " would become large")
         }
 
-        if (inc.isMonadic)          score += 4
-        else if (inc.isHigherOrder) score += 3
+        if (inc.isMonadic)          score += 3
+        else if (inc.isHigherOrder) score += 1
 
         if (inc.isInClosure)                 score += 2;
         if (inlinedMethodCount(inc.sym) > 2) score -= 2;
