@@ -875,10 +875,20 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
      *   - otherwise the signature in question
      */
     def getGenericSignature(sym: Symbol, owner: Symbol): String = {
-      println(sym + " (in " + sym.owner + ") => " + needsGenericSignature(sym))
       if (!needsGenericSignature(sym)) { return null }
 
-      val memberTpe = enteringErasure(owner.thisType.memberInfo(sym))
+      var memberTpe: Type = null
+
+      try {
+        memberTpe = enteringErasure(owner.thisType.memberInfo(sym))
+      } catch {
+        case _: Throwable =>
+          println("\n\ngetGenericSignature crash in " + sym)
+          println("owner:     " + owner)
+          println("owner.tpe: " + owner.thisType)
+          println("owner.tpe: " + global.typeDeconstruct.show(owner.thisType))
+          return null
+      }
 
       val jsOpt: Option[String] = erasure.javaSig(sym, memberTpe)
       if (jsOpt.isEmpty) { return null }
@@ -2410,7 +2420,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
         import asm.Opcodes
         (instr.category: @scala.annotation.switch) match {
 
-          case icodes.localsCat => 
+          case icodes.localsCat =>
           def genLocalInstr = (instr: @unchecked) match {
             case THIS(_) => jmethod.visitVarInsn(Opcodes.ALOAD, 0)
             case LOAD_LOCAL(local) => jcode.load(indexOf(local), local.kind)
@@ -2443,7 +2453,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
           }
           genLocalInstr
 
-          case icodes.stackCat => 
+          case icodes.stackCat =>
           def genStackInstr = (instr: @unchecked) match {
 
             case LOAD_MODULE(module) =>
@@ -2471,7 +2481,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
           case icodes.arilogCat => genPrimitive(instr.asInstanceOf[CALL_PRIMITIVE].primitive, instr.pos)
 
-          case icodes.castsCat => 
+          case icodes.castsCat =>
           def genCastInstr = (instr: @unchecked) match {
 
             case IS_INSTANCE(tpe) =>
@@ -2501,7 +2511,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
           }
           genCastInstr
 
-          case icodes.objsCat => 
+          case icodes.objsCat =>
           def genObjsInstr = (instr: @unchecked) match {
 
             case BOX(kind) =>
@@ -2521,7 +2531,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
           }
           genObjsInstr
 
-          case icodes.fldsCat => 
+          case icodes.fldsCat =>
           def genFldsInstr = (instr: @unchecked) match {
 
             case lf @ LOAD_FIELD(field, isStatic) =>
@@ -2542,7 +2552,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
           }
           genFldsInstr
 
-          case icodes.mthdsCat => 
+          case icodes.mthdsCat =>
           def genMethodsInstr = (instr: @unchecked) match {
 
             /** Special handling to access native Array.clone() */
@@ -2555,7 +2565,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
           }
           genMethodsInstr
 
-          case icodes.arraysCat => 
+          case icodes.arraysCat =>
           def genArraysInstr = (instr: @unchecked) match {
             case LOAD_ARRAY_ITEM(kind) => jcode.aload(kind)
             case STORE_ARRAY_ITEM(kind) => jcode.astore(kind)
@@ -2564,7 +2574,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
           }
           genArraysInstr
 
-          case icodes.jumpsCat => 
+          case icodes.jumpsCat =>
           def genJumpInstr = (instr: @unchecked) match {
 
             case sw @ SWITCH(tagss, branches) =>
@@ -2694,7 +2704,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
           }
           genJumpInstr
 
-          case icodes.retCat => 
+          case icodes.retCat =>
           def genRetInstr = (instr: @unchecked) match {
             case RETURN(kind) => jcode emitRETURN kind
             case THROW(_) => emit(Opcodes.ATHROW)
@@ -2814,9 +2824,9 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
           // TODO Logical's 2nd elem should be declared ValueTypeKind, to better approximate its allowed values (isIntSized, its comments appears to convey)
           // TODO GenICode uses `toTypeKind` to define that elem, `toValueTypeKind` would be needed instead.
           // TODO How about adding some asserts to Logical and similar ones to capture the remaining constraint (UNIT not allowed).
-          case Logical(op, kind) => 
+          case Logical(op, kind) =>
             def genLogical = op match {
-              case AND => 
+              case AND =>
                 kind match {
                   case LONG => emit(Opcodes.LAND)
                   case INT  => emit(Opcodes.IAND)
@@ -2842,8 +2852,8 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
                 }
             }
             genLogical
-          
-          case Shift(op, kind) => 
+
+          case Shift(op, kind) =>
             def genShift = op match {
               case LSL =>
                 kind match {
@@ -2872,7 +2882,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
             }
             genShift
 
-          case Comparison(op, kind) => 
+          case Comparison(op, kind) =>
             def genCompare = op match {
               case CMP =>
                 (kind: @unchecked) match {
@@ -2887,7 +2897,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
                 (kind: @unchecked) match {
                   case FLOAT  => emit(Opcodes.FCMPG)
                   case DOUBLE => emit(Opcodes.DCMPL) // TODO bug? why not DCMPG? http://docs.oracle.com/javase/specs/jvms/se5.0/html/Instructions2.doc3.html
-                
+
                 }
             }
             genCompare
