@@ -147,7 +147,7 @@ abstract class Inliners extends SubComponent {
         inlinedMths = 0
         super.run()
         for(c <- queue) { inliner analyzeClass c }
-        println(inlinedMths + " methods inlined, with a total of " + inlinedInsts + " instructions.")
+        log(inlinedMths + " methods inlined, with a total of " + inlinedInsts + " instructions.")
       } finally {
         inliner.clearCaches()
         knownLacksInline.clear()

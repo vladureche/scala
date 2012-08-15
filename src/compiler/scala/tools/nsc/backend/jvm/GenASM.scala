@@ -875,10 +875,20 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
      *   - otherwise the signature in question
      */
     def getGenericSignature(sym: Symbol, owner: Symbol): String = {
-      println(sym + " (in " + sym.owner + ") => " + needsGenericSignature(sym))
       if (!needsGenericSignature(sym)) { return null }
 
-      val memberTpe = beforeErasure(owner.thisType.memberInfo(sym))
+      var memberTpe: Type = null
+
+      try {
+        memberTpe = beforeErasure(owner.thisType.memberInfo(sym))
+      } catch {
+        case _: Throwable =>
+          println("\n\ngetGenericSignature crash in " + sym)
+          println("owner:     " + owner)
+          println("owner.tpe: " + owner.thisType)
+          println("owner.tpe: " + global.typeDeconstruct.show(owner.thisType))
+          return null
+      }
 
       val jsOpt: Option[String] = erasure.javaSig(sym, memberTpe)
       if (jsOpt.isEmpty) { return null }
