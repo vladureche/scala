@@ -81,7 +81,7 @@ trait Printers { self: ICodes =>
 
       if (!m.isAbstractMethod) {
         println(" {")
-        println("locals: " + m.locals.mkString("", ", ", ""))
+        println("locals: " + m.locals.map(loc => loc.toString + ": " + loc.kind + (if (loc.arg) "(arg)" else "")).mkString("", ", ", ""))
         println("startBlock: " + m.startBlock)
         println("blocks: " + m.code.blocks.mkString("[", ",", "]"))
         println
