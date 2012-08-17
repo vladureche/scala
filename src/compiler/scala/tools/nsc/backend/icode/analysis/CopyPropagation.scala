@@ -36,7 +36,7 @@ abstract class CopyPropagation {
   case class Deref(l: Location) extends Value
 
   /** The boxed value of some location. */
-  case class Boxed(l: Location) extends Value
+  case class Boxed(l: Location, tpe: TypeKind) extends Value
 
   /** The constant value c. */
   case class Const(c: Constant) extends Value
@@ -126,7 +126,7 @@ abstract class CopyPropagation {
             Some(getBinding(alias) match {
               case Record(_, _)         => derefAlias
               case Deref(Field(r1, f1)) => getFieldNonRecordValue(r1, f1) getOrElse derefAlias
-              case Boxed(_)             => derefAlias
+              case Boxed(_, _)          => derefAlias
               case v                    => v
             })
           case Deref(Field(r1, f1)) => getFieldNonRecordValue(r1, f1)
@@ -350,7 +350,7 @@ abstract class CopyPropagation {
 
         case BOX(tpe) =>
           val top = out.stack.head match {
-            case Deref(loc) => Boxed(loc)
+            case Deref(loc) => Boxed(loc, tpe)
             case _          => Unknown
           }
           out.stack = top :: out.stack.tail
@@ -358,8 +358,8 @@ abstract class CopyPropagation {
         case UNBOX(tpe) =>
           val top = out.stack.head
           top match {
-            case Boxed(loc) => Deref(loc) :: out.stack.tail
-            case _          => out.stack = Unknown :: out.stack.drop(1)
+            case Boxed(loc, tpe2) if tpe == tpe2 => Deref(loc) :: out.stack.tail
+            case _                               => out.stack = Unknown :: out.stack.drop(1)
           }
 
         case NEW(kind) =>
@@ -430,7 +430,7 @@ abstract class CopyPropagation {
         retain(r.bindings) { (loc, value) =>
           (value match {
             case Deref(loc1) if (loc1 == target) => false
-            case Boxed(loc1) if (loc1 == target)  => false
+            case Boxed(loc1, _) if (loc1 == target)  => false
             case _ => true
           }) && (target match {
             case Field(AllRecords, sym1) => !(loc == sym1)
@@ -443,14 +443,14 @@ abstract class CopyPropagation {
       s.stack = s.stack map { v => v match {
         case Record(_, bindings) =>
           cleanRecord(v.asInstanceOf[Record])
-        case Boxed(loc1) if (loc1 == target) => Unknown
+        case Boxed(loc1, _) if (loc1 == target) => Unknown
         case _ => v
       }}
 
       retain(s.bindings) { (loc, value) =>
         (value match {
           case Deref(loc1) if (loc1 == target) => false
-          case Boxed(loc1) if (loc1 == target) => false
+          case Boxed(loc1, _) if (loc1 == target) => false
           case rec @ Record(_, _) =>
             cleanRecord(rec);
             true
@@ -508,7 +508,7 @@ abstract class CopyPropagation {
       retain(state.bindings) { (loc, value) =>
         value match {
           case Deref(Field(rec, sym)) => shouldRetain(sym)
-          case Boxed(Field(rec, sym)) => shouldRetain(sym)
+          case Boxed(Field(rec, sym), _) => shouldRetain(sym)
           case _ => true
         }
       }
@@ -566,7 +566,7 @@ abstract class CopyPropagation {
       method.blocks map { b =>
         "\nIN(%s):\t Bindings: %s".format(b.label, in(b).bindings) +
         "\nIN(%s):\t Stack: %s".format(b.label, in(b).stack)
-      } 
+      }
     ).mkString
 
   } /* class CopyAnalysis */

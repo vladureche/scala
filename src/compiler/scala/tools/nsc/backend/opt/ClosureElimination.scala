@@ -103,7 +103,10 @@ abstract class ClosureElimination extends SubComponent {
         var info = cpp.in(bb)
         debuglog("Cpp info at entry to block " + bb + ": " + info)
 
+        //log("bb" + bb.label + ":")
+
         for (i <- bb) {
+          //log((if(info.bindings.isEmpty) "" else info.bindings.mkString("          ", "\n          ", "\n")) + "     %-50s".format(i.toString))
           i match {
             case LOAD_LOCAL(l) if info.bindings isDefinedAt LocalVar(l) =>
               val t = info.getBinding(l)
@@ -150,18 +153,18 @@ abstract class ClosureElimination extends SubComponent {
                 case _ =>
               }
 
-            case UNBOX(_) =>
+            case UNBOX(tpe) =>
               info.stack match {
                 case Deref(LocalVar(loc1)) :: _ if info.bindings isDefinedAt LocalVar(loc1) =>
                   val value = info.getBinding(loc1)
                   value match {
-                    case Boxed(LocalVar(loc2)) =>
+                    case Boxed(LocalVar(loc2), tpe2) if tpe == tpe2 =>
                       bb.replaceInstruction(i, DROP(icodes.ObjectReference) :: valueToInstruction(info.getBinding(loc2)) :: Nil)
                       log("replaced " + i + " with " + info.getBinding(loc2))
                     case _ =>
                       ()
                   }
-                case Boxed(LocalVar(loc1)) :: _ =>
+                case Boxed(LocalVar(loc1), tpe2) :: _  if tpe == tpe2 =>
                   val loc2 = info.getAlias(loc1)
                   bb.replaceInstruction(i, DROP(icodes.ObjectReference) :: valueToInstruction(Deref(LocalVar(loc2))) :: Nil)
                   log("replaced " + i + " with " + LocalVar(loc2))
@@ -188,7 +191,7 @@ abstract class ClosureElimination extends SubComponent {
         CONSTANT(k)
       case Deref(This) =>
         THIS(definitions.ObjectClass)
-      case Boxed(LocalVar(v)) =>
+      case Boxed(LocalVar(v), _) =>
         LOAD_LOCAL(v)
     }
 
