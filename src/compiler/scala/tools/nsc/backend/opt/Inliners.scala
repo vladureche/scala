@@ -90,8 +90,6 @@ abstract class Inliners extends SubComponent {
     else sym
   }
 
-  var methodName = ""
-
   /* A warning threshold */
   private final val MAX_INLINE_MILLIS = 2000
 
@@ -206,9 +204,7 @@ abstract class Inliners extends SubComponent {
 
     /** The current iclass */
     private var currentIClazz: IClass = _
-    private def warn(pos: Position, msg: String) = if (methodName == "GenSeqViewLike$Reversed$$anonfun$createReversedIterator$1") println(msg)
-    def log(msg: String) = if (methodName == "GenSeqViewLike$Reversed$$anonfun$createReversedIterator$1") println(msg)
-    def debuglog(msg: String) = if (methodName == "GenSeqViewLike$Reversed$$anonfun$createReversedIterator$1") println(msg)
+    private def warn(pos: Position, msg: String) = currentIClazz.cunit.inlinerWarning(pos, msg)
 
     val recentTFAs = mutable.Map.empty[Symbol, Tuple2[Boolean, analysis.MethodTFA]]
 
@@ -312,8 +308,6 @@ abstract class Inliners extends SubComponent {
      * */
     def analyzeMethod(m: IMethod): Unit = {
       // m.normalize
-
-      methodName = m.symbol.nameString
 
       // reinitialize the tfa instance so the old one can be GC'd -- otherwise garbage will gather in the "in" and "out"
       // maps, leading to a crash
