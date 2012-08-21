@@ -787,10 +787,7 @@ abstract class Inliners extends SubComponent {
         tfa.warnIfInlineFails.remove(instr)
 
         val targetPos = instr.pos
-        if (caller.m.symbol.owner.nameString == "IndexedSeqLike$$anon$1")
-          println("Inlining " + inc.m + " in " + caller.m + " at pos: " + posToStr(targetPos))
-        else
-          log("Inlining " + inc.m + " in " + caller.m + " at pos: " + posToStr(targetPos))
+        log("Inlining " + inc.m + " in " + caller.m + " at pos: " + posToStr(targetPos))
 
         def blockEmit(i: Instruction) = block.emit(i, targetPos)
         def newLocal(baseName: String, kind: TypeKind) =
