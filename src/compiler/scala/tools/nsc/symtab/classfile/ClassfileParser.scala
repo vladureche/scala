@@ -425,7 +425,7 @@ abstract class ClassfileParser {
     // start the search
     val result = enteringFlatten { searchDeep(parts, sym, 0, module) }
 
-    if(result == NoSymbol)
+    if(result == NoSymbol || result.isPackage)
       // If you want to check the symbols are correctly resolced turn this into a println
       log("Broken ICodeReader signature: " + name + " => " + result)
     result

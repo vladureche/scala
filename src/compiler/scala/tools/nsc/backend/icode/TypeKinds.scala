@@ -1,3 +1,4 @@
+
 /* NSC -- new Scala compiler
  * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
@@ -268,8 +269,6 @@ trait TypeKinds { self: ICodes =>
   /** A class type. */
   final case class REFERENCE(cls: Symbol) extends TypeKind {
     override def toString = "REF(" + cls + ")"
-    assert(!cls.isPackage,
-           "REFERENCE to package not allowed: " + cls + "  " + cls.isPackage)
     assert(cls ne null,
            "REFERENCE to null class symbol.")
     assert(cls != ArrayClass,

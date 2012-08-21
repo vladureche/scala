@@ -787,10 +787,7 @@ abstract class Inliners extends SubComponent {
         tfa.warnIfInlineFails.remove(instr)
 
         val targetPos = instr.pos
-        if (caller.m.symbol.owner.nameString == "IndexedSeqLike$$anon$1")
-          println("Inlining " + inc.m + " in " + caller.m + " at pos: " + posToStr(targetPos))
-        else
-          log("Inlining " + inc.m + " in " + caller.m + " at pos: " + posToStr(targetPos))
+        log("Inlining " + inc.m + " in " + caller.m + " at pos: " + posToStr(targetPos))
 
         def blockEmit(i: Instruction) = block.emit(i, targetPos)
         def newLocal(baseName: String, kind: TypeKind) =
@@ -1018,35 +1015,6 @@ abstract class Inliners extends SubComponent {
          *         while having a top-level finalizer (see liftedTry problem)
          * As a result of (b), some synthetic private members can be chosen to become public.
          */
-        // TODO: Add stack limit in Inliners
-        // if you replace the isScoreOkay to be always true in Inliners.scala and compile
-        // src/reflect/scala/reflect/internal/Types.scala you'll notice a crash in ASM:
-        // stacktrace:
-        //  uncaught exception during compilation: java.lang.NegativeArraySizeException
-        //  error: java.lang.NegativeArraySizeException
-        //    at scala.tools.asm.Frame.merge(Unknown Source)
-        //    at scala.tools.asm.MethodWriter.visitMaxs(Unknown Source)
-        //    at scala.tools.nsc.backend.jvm.GenASM$JPlainBuilder.genMethod(GenASM.scala:1635)
-        //    at scala.tools.nsc.backend.jvm.GenASM$JPlainBuilder$$anonfun$genClass$5.apply(GenASM.scala:1463)
-        //    at scala.tools.nsc.backend.jvm.GenASM$JPlainBuilder$$anonfun$genClass$5.apply(GenASM.scala:1463)
-        //    at scala.collection.LinearSeqOptimized$class.foreach(LinearSeqOptimized.scala:59)
-        //    at scala.collection.immutable.List.foreach(List.scala:78)
-        //    at scala.tools.nsc.backend.jvm.GenASM$JPlainBuilder.genClass(GenASM.scala:1463)
-        //    at scala.tools.nsc.backend.jvm.GenASM$AsmPhase.run(GenASM.scala:180)
-        //    at scala.tools.nsc.Global$Run.compileUnitsInternal(Global.scala:1576)
-        //    at scala.tools.nsc.Global$Run.compileUnits(Global.scala:1550)
-        //    at scala.tools.nsc.Global$Run.compileSources(Global.scala:1546)
-        //    at scala.tools.nsc.Global$Run.compile(Global.scala:1656)
-        //    at scala.tools.nsc.Driver.doCompile(Driver.scala:33)
-        //    at scala.tools.nsc.Main$.doCompile(Main.scala:79)
-        //    at scala.tools.nsc.Driver.process(Driver.scala:54)
-        //    at scala.tools.nsc.Driver.main(Driver.scala:67)
-        //    at scala.tools.nsc.Main.main(Main.scala)
-        // the explanation:
-        // $ java -cp ../../build/pack/lib/scala-library.jar:classes 'scala.reflect.internal.Types$ConstantType$'
-        // Exception in thread "main" java.lang.VerifyError: (class: scala/reflect/internal/Types$ConstantType$, method: overwrite$1 signature: (ILscala/reflect/internal/Types$Type;[Ljava/lang/Object;)V) Stack size too large
-        // Could not find the main class: scala.reflect.internal.Types$ConstantType$.  Program will exit.
-
         if(!isInlineForced && !isScoreOK) {
           // During inlining retry, a previous caller-callee pair that scored low may pass.
           // Thus, adding the callee to tfa.knownUnsafe isn't warranted.
