@@ -269,7 +269,7 @@ abstract class Inliners extends SubComponent {
         }
       }
 
-    val tfa   = new analysis.MTFAGrowable()
+    var tfa   = new analysis.MTFAGrowable()
     tfa.stat  = global.settings.Ystatistics.value
     val staleOut      = new mutable.ListBuffer[BasicBlock]
     val splicedBlocks = mutable.Set.empty[BasicBlock]
