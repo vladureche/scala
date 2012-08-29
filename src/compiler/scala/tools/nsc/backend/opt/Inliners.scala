@@ -94,10 +94,10 @@ abstract class Inliners extends SubComponent {
   private final val MAX_INLINE_MILLIS = 2000
 
   /** The large size in basic blocks of methods considered for inlining. */
-  final val MAX_INLINE_SIZE = 16
+  final val MAX_INLINE_SIZE = 25
 
-  /** The maximum size in basic blocks of methods considered for inlining. */
-  final val MAX_INSTRUCTION_SIZE = 1000
+  /** The large size in basic blocks of methods considered for inlining. */
+  final val MAX_INSTR_SIZE = 5000
 
   /** Maximum loop iterations. */
   final val MAX_INLINE_RETRY = 15
@@ -210,7 +210,7 @@ abstract class Inliners extends SubComponent {
 
     private def getRecentTFA(incm: IMethod, forceable: Boolean): (Boolean, analysis.MethodTFA) = {
 
-        def containsRETURN(blocks: List[BasicBlock]) = blocks exists { bb => bb.lastInstruction.isInstanceOf[RETURN] }
+      def containsRETURN(blocks: List[BasicBlock]) = blocks exists { bb => bb.lastInstruction.isInstanceOf[RETURN] }
 
       val opt = recentTFAs.get(incm.symbol)
       if(opt.isDefined) {
@@ -419,7 +419,7 @@ abstract class Inliners extends SubComponent {
 
             case Some(callee) if callee.hasCode =>
               val inc   = new IMethodInfo(callee)
-              val pair  = new CallerCalleeInfo(caller, inc, fresh, inlinedMethodCount)
+              val pair  = new CallerCalleeInfo(caller, inc, i.inlineHistory, fresh, inlinedMethodCount)
 
               if(inc.hasHandlers && (stackLength == -1)) {
                 // no inlining is done, yet don't warn about it, stackLength == -1 indicates we're trying to inlineWithoutTFA.
@@ -632,7 +632,7 @@ abstract class Inliners extends SubComponent {
 
       def isSmall       = (length <= SMALL_METHOD_SIZE) && blocks(0).length < 10
       def isLarge       = length > MAX_INLINE_SIZE
-      def isExtraLarge  = m.code.instructions.length > MAX_INSTRUCTION_SIZE
+      def isExtraLarge  = instructions.length > MAX_INSTR_SIZE
       def isRecursive   = m.recursive
       def hasHandlers   = handlers.nonEmpty || m.bytecodeHasEHs
 
@@ -697,11 +697,11 @@ abstract class Inliners extends SubComponent {
         def checkMethod(n: Symbol)  = check(n, n.isPrivate)
 
         def getAccess(i: Instruction) = i match {
-          case CALL_METHOD(n, SuperCall(_)) => checkSuper(n)
-          case CALL_METHOD(n, _)            => checkMethod(n)
-          case LOAD_FIELD(f, _)             => checkField(f)
-          case STORE_FIELD(f, _)            => checkField(f)
-          case _                            => Public
+          case CALL_METHOD(n, SuperCall(_), _) => checkSuper(n)
+          case CALL_METHOD(n, _, _)            => checkMethod(n)
+          case LOAD_FIELD(f, _)                => checkField(f)
+          case STORE_FIELD(f, _)               => checkField(f)
+          case _                               => Public
         }
 
         var seen = Public
@@ -757,7 +757,7 @@ abstract class Inliners extends SubComponent {
       toBecomePublic: List[Symbol]
     )
 
-    final class CallerCalleeInfo(val caller: IMethodInfo, val inc: IMethodInfo, fresh: mutable.Map[String, Int], inlinedMethodCount: collection.Map[Symbol, Int]) {
+    final class CallerCalleeInfo(val caller: IMethodInfo, val inc: IMethodInfo, inlineHistory: List[Symbol], fresh: mutable.Map[String, Int], inlinedMethodCount: collection.Map[Symbol, Int]) {
 
       assert(!caller.isBridge && inc.m.hasCode,
              "A guard in Inliner.analyzeClass() should have prevented from getting here.")
@@ -882,15 +882,12 @@ abstract class Inliners extends SubComponent {
             case STORE_LOCAL(l)                 => assertLocal(l)
             case SCOPE_ENTER(l) if isInlined(l) => SCOPE_ENTER(inlinedLocals(l))
             case SCOPE_EXIT(l) if isInlined(l)  => SCOPE_EXIT(inlinedLocals(l))
-
             case nw @ NEW(sym) =>
               val r = NEW(sym)
               pending(nw.init) = r
               r
-
-            case CALL_METHOD(meth, Static(true)) if meth.isClassConstructor =>
-              CALL_METHOD(meth, Static(true))
-
+            case CALL_METHOD(meth, style, inlineHistory) =>
+              CALL_METHOD(meth, style, inc.sym :: inlineHistory)
             case _ => i.clone()
           }
           // check any pending NEW's
@@ -1063,29 +1060,36 @@ abstract class Inliners extends SubComponent {
         debuglog("shouldInline: " + caller.m + " , callee:" + inc.m)
 
         def table: List[(String, Boolean, Int)] = List(
-          ("[caller] inlined methods > 2", inlinedMethodCount(inc.sym) > 2, -1),
+          //("[caller] inlined methods > 2", inlinedMethodCount(inc.sym) > 2, -1),
           ("[caller] isInClosure        ", caller.isInClosure, -2),
           ("[caller] would become large ", caller.isSmall && isLargeSum, -1),
-          ("[any] isExtraLarge          ", inc.isExtraLarge || caller.isExtraLarge, -10), // Remember scala.collection.immutable.Stream? Well, that would inline forever otherwise:
+          ("[caller] isExtraLarge       ", caller.isExtraLarge, -100),
           ("[callee] isSmall            ", inc.isSmall, 1),
-          ("[callee] isLarge            ", inc.isSmall, -1),
-          ("[callee] @inline            ", inc.m.symbol.hasAnnotation(ScalaInlineClass), 2),
-          ("[callee] isMonadic          ", inc.isMonadic, 2),
+          ("[callee] isLarge            ", inc.isLarge, -1),
+          ("[callee] isExtraLarge       ", inc.isExtraLarge, -100),
+          ("[callee] @inline            ", inc.sym.hasAnnotation(ScalaInlineClass), 3),
+          ("[callee] isMonadic          ", inc.isMonadic, 3),
           ("[callee] isHigherOrder      ", inc.isHigherOrder, 3),
-          ("[callee] isApply            ", (nme.unspecializedName(inc.m.symbol.name) == nme.apply), 2),
-          ("[callee] isInClosure        ", inc.isInClosure, 2))
+          ("[callee] isApply            ", (nme.unspecializedName(inc.sym.name) == nme.apply), 3),
+          ("[callee] isInClosure        ", inc.isInClosure, 3),
+          ("[callee] inlinedHistory     ", inlineHistory.contains(inc.sym), -100))
 
         val score = table.foldLeft(0)((score, tuple) => if (tuple._2) score + tuple._3 else score)
-        log("shouldInline(" + inc.m + ") score: " + score)
+        val callerName = caller.sym.ownerChain.reverse.map(_.name).mkString(".")
+        if ((callerName == "<root>.scala.reflect.internal.Typess$ConstantType2.apply") ||
+            (callerName == "<root>.scala.reflect.internal.Types$ConstantType.apply"))
+          println("shouldInline(" + inc.m + ") score: " + score)
+        //else
+        //  println(" - " + callerName)
 
         if (inc.owner.isAnonymousFunction && score < 0) {
-          log("closure not inlined: " + inc.m + " in " + caller.m)
+          println("closure not inlined: " + inc.m + " in " + caller.m)
           for ((label, status, value) <- table)
             log("  " + label + "  " + (if(status) value else 0) + " / " + value)
-          log("  score: " + score)
+          println("  score: " + score)
         }
 
-        score > 0
+        score >= 0
       }
     }
 

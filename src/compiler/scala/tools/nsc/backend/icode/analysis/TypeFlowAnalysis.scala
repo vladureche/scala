@@ -230,7 +230,7 @@ abstract class TypeFlowAnalysis {
             case StringConcat(el)     => stack.pop2; stack push ConcatClass
           }
 
-        case cm @ CALL_METHOD(_, _) =>
+        case cm @ CALL_METHOD(_, _, _) =>
           stack pop cm.consumed
           cm.producedTypes foreach (stack push _)
 

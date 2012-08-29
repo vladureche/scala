@@ -126,14 +126,14 @@ abstract class DeadCodeElimination extends SubComponent {
             case RETURN(_) | JUMP(_) | CJUMP(_, _, _, _) | CZJUMP(_, _, _, _) | STORE_FIELD(_, _) |
                  THROW(_)   | LOAD_ARRAY_ITEM(_) | STORE_ARRAY_ITEM(_) | SCOPE_ENTER(_) | SCOPE_EXIT(_) | STORE_THIS(_) |
                  LOAD_EXCEPTION(_) | SWITCH(_, _) | MONITOR_ENTER() | MONITOR_EXIT() => worklist += ((bb, idx))
-            case CALL_METHOD(m1, _) if isSideEffecting(m1) => worklist += ((bb, idx)); log("marking " + m1)
-            case CALL_METHOD(m1, SuperCall(_)) =>
+            case CALL_METHOD(m1, _, _) if isSideEffecting(m1) => worklist += ((bb, idx)); log("marking " + m1)
+            case CALL_METHOD(m1, SuperCall(_), _) =>
               worklist += ((bb, idx)) // super calls to constructor
             case DROP(_) =>
               val necessary = rdef.findDefs(bb, idx, 1) exists { p =>
                 val (bb1, idx1) = p
                 bb1(idx1) match {
-                  case CALL_METHOD(m1, _) if isSideEffecting(m1) => true
+                  case CALL_METHOD(m1, _, _) if isSideEffecting(m1) => true
                   case LOAD_EXCEPTION(_) | DUP(_) | LOAD_MODULE(_) => true
                   case _ =>
                     dropOf((bb1, idx1)) = (bb,idx) :: dropOf.getOrElse((bb1, idx1), Nil)

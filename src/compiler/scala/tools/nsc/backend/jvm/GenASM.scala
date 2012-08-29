@@ -1648,7 +1648,12 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
         val hasStaticBitSet = ((flags & asm.Opcodes.ACC_STATIC) != 0)
         genCode(m, emitVars, hasStaticBitSet)
 
-        jmethod.visitMaxs(0, 0) // just to follow protocol, dummy arguments
+        try {
+          jmethod.visitMaxs(0, 0) // just to follow protocol, dummy arguments
+        } catch {
+          case _: java.lang.NegativeArraySizeException =>
+            println("Stack-related crash while generating: " + m.symbol.ownerChain.reverse.mkString(" -> "))
+        }
       }
 
       jmethod.visitEnd()
@@ -2339,7 +2344,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       } // end of genCode()'s isAccessibleFrom()
 
       def genCallMethod(call: CALL_METHOD) {
-        val CALL_METHOD(method, style) = call
+        val CALL_METHOD(method, style, _) = call
         val siteSymbol  = clasz.symbol
         val hostSymbol  = call.hostClass
         val methodOwner = method.owner
@@ -2556,11 +2561,11 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
           def genMethodsInstr = (instr: @unchecked) match {
 
             /** Special handling to access native Array.clone() */
-            case call @ CALL_METHOD(definitions.Array_clone, Dynamic) =>
+            case call @ CALL_METHOD(definitions.Array_clone, Dynamic, _) =>
               val target: String = javaType(call.targetTypeKind).getInternalName
               jcode.invokevirtual(target, "clone", mdesc_arrayClone)
 
-            case call @ CALL_METHOD(method, style) => genCallMethod(call)
+            case call @ CALL_METHOD(method, style, _) => genCallMethod(call)
 
           }
           genMethodsInstr

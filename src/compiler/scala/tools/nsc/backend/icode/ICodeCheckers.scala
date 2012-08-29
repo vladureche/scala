@@ -261,7 +261,7 @@ abstract class ICodeCheckers {
           (stringConcatIndent(), this.instruction match {
             case CALL_PRIMITIVE(StringConcat(el)) => "..."
             case null                             => "null"
-            case cm @ CALL_METHOD(_, _)           => if (clasz.symbol == cm.hostClass) cm.toShortString else cm.toString
+            case cm @ CALL_METHOD(_, _, _)        => if (clasz.symbol == cm.hostClass) cm.toShortString else cm.toString
             case x                                => x.toString
           })
       }
@@ -595,7 +595,7 @@ abstract class ICodeCheckers {
                pushStack(ConcatClass)
            }
 
-         case CALL_METHOD(method, style) =>
+         case CALL_METHOD(method, style, _) =>
            // PP to ID: I moved the if (!method.isConstructor) check to cover all
            // the styles to address checker failure.  Can you confirm if the change
            // was correct? If I remember right it's a matter of whether some brand

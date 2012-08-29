@@ -363,8 +363,11 @@ trait Opcodes { self: ICodes =>
      * Stack: ...:arg1:arg2:...:argn
      *    ->: ...:result
      *
+     * The inline history stores the provenance information for the CALL_METHOD
+     * as we don't want to have cyclic (and possibly recursive) inlining
      */
-    case class CALL_METHOD(method: Symbol, style: InvokeStyle) extends Instruction with ReferenceEquality {
+    case class CALL_METHOD(val method: Symbol, val style: InvokeStyle, val inlineHistory: List[Symbol] = Nil) extends Instruction with ReferenceEquality {
+
       def toShortString =
         "CALL_METHOD " + method.name +" ("+style+")"
 

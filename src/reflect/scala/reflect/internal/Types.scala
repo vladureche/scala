@@ -3892,7 +3892,7 @@ trait Types extends api.Types { self: SymbolTable =>
 // Hash consing --------------------------------------------------------------
 
   private val initialUniquesCapacity = 4096
-  private var uniques: util.HashSet[Type] = _
+  var uniques: util.HashSet[Type] = _
   private var uniqueRunId = NoRunId
 
   protected def unique[T <: Type](tp: T): T = {

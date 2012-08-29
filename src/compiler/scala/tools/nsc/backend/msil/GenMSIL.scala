@@ -1071,7 +1071,7 @@ abstract class GenMSIL extends SubComponent {
           case CALL_PRIMITIVE(primitive) =>
             genPrimitive(primitive, instr.pos)
 
-          case CALL_METHOD(msym, style) =>
+          case CALL_METHOD(msym, style, _) =>
             if (msym.isClassConstructor) {
               val constructorInfo: ConstructorInfo = getConstructor(msym)
               (style: @unchecked) match {

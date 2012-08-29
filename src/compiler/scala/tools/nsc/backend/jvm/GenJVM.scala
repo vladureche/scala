@@ -1269,7 +1269,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
       }
 
       def genCallMethod(call: CALL_METHOD) {
-        val CALL_METHOD(method, style) = call
+        val CALL_METHOD(method, style, _) = call
         val siteSymbol  = clasz.symbol
         val hostSymbol  = call.hostClass
         val methodOwner = method.owner
@@ -1408,11 +1408,11 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
             case CALL_PRIMITIVE(primitive) => genPrimitive(primitive, instr.pos)
 
             /** Special handling to access native Array.clone() */
-            case call @ CALL_METHOD(definitions.Array_clone, Dynamic) =>
+            case call @ CALL_METHOD(definitions.Array_clone, Dynamic, _) =>
               val target: String = javaType(call.targetTypeKind).getSignature()
               jcode.emitINVOKEVIRTUAL(target, "clone", arrayCloneType)
 
-            case call @ CALL_METHOD(method, style) => genCallMethod(call)
+            case call @ CALL_METHOD(method, style, _) => genCallMethod(call)
 
             case BOX(kind) =>
               val Pair(mname, mtype) = jBoxTo(kind)

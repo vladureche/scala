@@ -264,6 +264,7 @@ abstract class InlineExceptionHandlers extends SubComponent {
       if (analyzedMethod eq NoIMethod) {
         analyzedMethod = bblock.method
         tfa.init(bblock.method)
+        println(analyzedMethod)
         tfa.run
         log("      performed tfa on method: " + bblock.method)
 

@@ -320,7 +320,7 @@ abstract class CopyPropagation {
           // TODO: model primitives
           out.stack = Unknown :: out.stack.drop(i.consumed)
 
-        case CALL_METHOD(method, style) => style match {
+        case CALL_METHOD(method, style, _) => style match {
           case Dynamic =>
             out = simulateCall(in, method, false)
 
