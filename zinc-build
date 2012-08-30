@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+#
+
+elapsedTime () {
+  ( TIMEFORMAT='%3R' && time eval "$@" || exit $? ) 2>&1 1>/dev/null | tail -1
+}
+
+BOOTSTRAP=/scala/inst/210
+ANT=$(ant -diagnostics |grep ^ant.core.lib | sed 's/^ant.core.lib: //')
+ASM=build/locker/classes/asm
+AUXCP=$ASM:$ANT:lib/msil.jar:lib/forkjoin.jar:lib/jline.jar:lib/fjbg.jar
+LOCKERDIST=build/locker/dist
+PACK=build/pack
+LOCKERLOCK=build/locker/lockerdist.complete
+STARTSTAMP=build/zinc.started
+LOCKERTARGETS="asm library reflect compiler"
+QUICKTARGETS="asm library reflect compiler actors scalap scalacheck partest"
+PACKEXTRA="lib/jline.jar"
+RUNNER="src/runtime/scala-runner.sh"
+PROGRAMS="scala scalac fsc scaladoc scalap"
+unset debug
+
+die () {
+  echo "Fatal error $@."
+  exit 1
+}
+
+run () {
+  [[ -n $debug ]] && echo "$@"
+  "$@"
+}
+
+compile () {
+  local layer="$1"
+  local scalaHome="$2"
+  local fileset="$3"
+  local stamp="build/$layer/$fileset.stamp"
+
+  # if no source file is newer than the stamp, bail out
+  [[ -f "$stamp" ]] && [[ -z $(find src/$fileset -type f -newer "$stamp") ]] && return
+
+  run zinc -nailed \
+    -scala-home $scalaHome \
+    -d build/$layer/classes/$fileset \
+    -classpath $(cpof build/$layer/classes):$AUXCP \
+    $(find src/$fileset -name '*.scala' -o -name '*.java') && \
+        touch $stamp
+}
+
+locker () {
+  compile locker "$BOOTSTRAP" "$1"
+}
+
+quick () {
+  compile quick "$LOCKERDIST" "$1"
+}
+
+props () {
+  local date_s=$(date '+%Y%m%d')
+  local time_s=$(date '+%H%M%S')
+  local sha=$(git log -n1 --format=%h)
+  cat <<EOM
+version.number=2.10.0-$date_s-$time_s-$sha
+maven.version.number=2.10.0-SNAPSHOT
+osgi.version.number=2.10.0.v$date_s-$time_s-$sha
+copyright.string=Copyright 2002-2012, LAMP/EPFL
+EOM
+}
+
+ensureManifest () {
+  local classes="$1"
+
+  manifest () {
+cat <<EOM
+Manifest-Version: 1.0
+Created-By: paulp
+EOM
+  }
+
+  [[ -d "$classes/META-INF" ]] || mkdir -p "$classes/META-INF"
+  [[ -f "$classes/META-INF/MANIFEST.MF" ]] || manifest > "$classes/META-INF/MANIFEST.MF"
+}
+
+jarup () {
+  local layer="$1"
+  local fileset="$2"
+  local dist="$3"
+  local classes="build/$layer/classes/$fileset"
+  local target="$dist/lib/scala-$fileset.jar"
+  local changed=""
+
+  if [[ -f "$target" ]]; then
+    changed=$(echo $(find "$classes" -newer "$STARTSTAMP" | wc -l))
+    if [[ $changed -eq 0 ]]; then
+      echo "$target is up to date."
+      return
+    fi
+  fi
+
+  [[ -d "$dist/lib" ]] || mkdir -p "$dist/lib"
+  ensureManifest "$classes"
+  props >"$classes/$fileset.properties"
+
+  if [[ -f "$target" ]]; then
+    elapsed=$(elapsedTime 'cd "$classes" && /usr/bin/zip --display-counts --filesync -r ../../../../$target *' ) &&
+      echo "$target updated with $changed classes [${elapsed}s]"
+  else
+    elapsed=$(elapsedTime 'cd "$classes" && /usr/bin/zip --display-dots -r ../../../../$target *' ) &&
+      echo "$target created [${elapsed}s]"
+  fi
+}
+
+buildLocker () {
+  for d in $LOCKERTARGETS; do
+    locker $d || die "compiling $d"
+  done
+}
+
+packLocker () {
+  buildLocker
+
+  for d in $LOCKERTARGETS; do
+    jarup locker $d "$LOCKERDIST" || die "creating jar $d"
+  done
+
+  touch build/locker/lockerdist.complete
+}
+
+checkLocker () {
+  if [[ -f $LOCKERLOCK ]]; then
+    echo "Locker is locked."
+  else
+    packLocker
+  fi
+}
+
+buildQuick () {
+  checkLocker
+  for d in $QUICKTARGETS; do
+    quick $d || die "compiling $d"
+  done
+}
+
+packQuick () {
+  buildQuick
+  for d in $QUICKTARGETS; do
+    jarup quick $d "$PACK" || die "creating jar $d"
+  done
+
+  for d in $PACKEXTRA; do
+    [[ -f "$PACK/lib/$(basename $d)" ]] || { cp "$d" "$PACK/lib" && echo "Copied $d."; }
+  done
+
+  [[ -d "$PACK/bin" ]] || mkdir "$PACK/bin"
+  cp "$RUNNER" "$PACK/bin" &&
+    ( cd "$PACK/bin" && for name in $PROGRAMS ; do rm -f $name && ln -s ./$(basename "$RUNNER") $name ; done; )
+}
+
+unlockLocker () {
+  rm -f "$LOCKERLOCK"
+}
+
+runClean () {
+  for dir in "$@"; do
+    ( cd "$dir" && rm -rf $( ls -1 | grep -v ^cache$ ) )
+  done
+}
+
+[[ $# -gt 0 ]] || {
+  cat <<EOM
+Usage: $0 [-d] <target> [target target ...]
+
+Targets are:
+  unlock      unlocks locker
+  locker      builds locker
+  lockerdist  builds locker distribution
+  quick       builds quick
+  pack        builds quick distribution
+  clean       removes quick classfiles
+  allclean    removes all classfiles
+  all         builds everything
+EOM
+}
+
+[[ -d build ]] || mkdir build
+touch "$STARTSTAMP"
+
+for arg in "$@"; do
+  case $arg in
+        -d) debug=1 ;;
+    unlock) unlockLocker ;;
+    locker) buildLocker ;;
+lockerdist) packLocker ;;
+     quick) buildQuick ;;
+      pack) packQuick ;;
+     clean) runClean build/quick/classes ;;
+  allclean) unlockLocker && runClean build/{locker,quick}/classes ;;
+       all) packQuick ;;
+         *) die "Unknown target $arg" ;;
+  esac
+done
