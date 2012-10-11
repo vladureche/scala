@@ -14,19 +14,29 @@ package api
 // reference `Mirror` and also need to be defined outside the cake as they are used by type tags, which can be migrated between 
 // different universes and consequently cannot be bound to a fixed one.
 abstract class Mirror[U <: Universe with Singleton] {
-  /** The universe this mirror belongs to. */
+  /** The universe this mirror belongs to.
+   *  @group Mirror
+   */
   val universe: U
 
-  /** The class symbol of the `_root_` package */
+  /** The class symbol of the `_root_` package
+   *  @group Mirror
+   */
   def RootClass: U#ClassSymbol
 
-  /** The module symbol of the `_root_` package */
+  /** The module symbol of the `_root_` package
+   *  @group Mirror
+   */
   def RootPackage: U#ModuleSymbol
 
-  /** The module class symbol of the default (unnamed) package */
+  /** The module class symbol of the default (unnamed) package
+   *  @group Mirror
+   */
   def EmptyPackageClass: U#ClassSymbol
 
-  /** The module symbol of the default (unnamed) package */
+  /** The module symbol of the default (unnamed) package
+   *  @group Mirror
+   */
   def EmptyPackage: U#ModuleSymbol
 
   /** The symbol corresponding to the globally accessible class with the
@@ -70,6 +80,7 @@ abstract class Mirror[U <: Universe with Singleton] {
    *
    *  In the example above, to load a symbol that corresponds to the class B declared in the object foo,
    *  use staticModule("foo") to load the module symbol and then navigate typeSignature.members of its moduleClass.
+   *  @group Mirror
    */
   def staticClass(fullName: String): U#ClassSymbol
 
@@ -96,11 +107,13 @@ abstract class Mirror[U <: Universe with Singleton] {
    *
    *  In the example above, to load a symbol that corresponds to the object B declared in the object foo,
    *  use staticModule("foo") to load the module symbol and then navigate typeSignature.members of its moduleClass.
+   *  @group Mirror
    */
   def staticModule(fullName: String): U#ModuleSymbol
 
   /** The symbol corresponding to a package with the
    *  given fully qualified name `fullName`.
+   *  @group Mirror
    */
   def staticPackage(fullName: String): U#ModuleSymbol
 }

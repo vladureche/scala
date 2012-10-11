@@ -49,6 +49,9 @@ package api
  *
  * For more information about `Universe`s, see the [[http://docs.scala-lang.org/overviews/reflection/environment-universes-mirrors.html Reflection Guide: Universes]]
  *
+ *  @groupprio Universe -1
+ *
+ *  @contentDiagram hideNodes "*Api"
  */
 abstract class Universe extends Symbols
                            with Types
@@ -75,13 +78,14 @@ abstract class Universe extends Symbols
    *
    * {{{
    * val five = reify{ 5 }    // Literal(Constant(5))
-   * reify{ 2 + 4 }           // Apply( Select( Literal(Constant(2)), newTermName("$plus")), List( Literal(Constant(4)) ) )
-   * reify{ five.splice + 4 } // Apply( Select( Literal(Constant(5)), newTermName("$plus")), List( Literal(Constant(4)) ) )
+   * reify{ 2 + 4 }           // Apply( Select( Literal(Constant(2)), newTermName("\$plus")), List( Literal(Constant(4)) ) )
+   * reify{ five.splice + 4 } // Apply( Select( Literal(Constant(5)), newTermName("\$plus")), List( Literal(Constant(4)) ) )
    * }}}
    *
    * The produced tree is path dependent on the Universe `reify` was called from.
    *
-   * Use [[scala.reflect.api.Exprs#Expr.splice]] to embed an existing expression into a reify call. Use [[Expr]] to turn a [[Tree]] into an expression that can be spliced.
+   * Use [[scala.reflect.api.Exprs#Expr.splice]] to embed an existing expression into a `reify` call. Use [[Expr]] to turn a [[Tree]] into an expression that can be spliced.
+   * @group Universe
    */
   // implementation is hardwired to `scala.reflect.reify.Taggers`
   // using the mechanism implemented in `scala.tools.reflect.FastTrack`

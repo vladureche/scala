@@ -130,6 +130,7 @@ import java.io.{ PrintWriter, StringWriter }
  */
 trait Printers { self: Universe =>
 
+  /** @group Printers */
   protected trait TreePrinter {
     def print(args: Any*)
     protected var printTypes = false
@@ -146,13 +147,16 @@ trait Printers { self: Universe =>
     def withoutMirrors: this.type = { printMirrors = false; this }
   }
 
+  /** @group Printers */
   case class BooleanFlag(val value: Option[Boolean])
+  /** @group Printers */
   object BooleanFlag {
     import scala.language.implicitConversions
     implicit def booleanToBooleanFlag(value: Boolean): BooleanFlag = BooleanFlag(Some(value))
     implicit def optionToBooleanFlag(value: Option[Boolean]): BooleanFlag = BooleanFlag(value)
   }
 
+  /** @group Printers */
   protected def render(what: Any, mkPrinter: PrintWriter => TreePrinter, printTypes: BooleanFlag = None, printIds: BooleanFlag = None, printKinds: BooleanFlag = None, printMirrors: BooleanFlag = None): String = {
     val buffer = new StringWriter()
     val writer = new PrintWriter(buffer)
@@ -166,42 +170,54 @@ trait Printers { self: Universe =>
     buffer.toString
   }
 
-  /** By default trees are printed with `show` */
+  /** By default trees are printed with `show`
+   * @group Printers
+   */
   override protected def treeToString(tree: Tree) = show(tree)
 
   /** Renders a representation of a reflection artifact
    * as desugared Java code.
+   *
+   * @group Printers
    */
   def show(any: Any, printTypes: BooleanFlag = None, printIds: BooleanFlag = None, printKinds: BooleanFlag = None, printMirrors: BooleanFlag = None): String =
     render(any, newTreePrinter(_), printTypes, printIds, printKinds, printMirrors)
 
   /** Hook to define what `show(...)` means.
+   * @group Printers
    */
   protected def newTreePrinter(out: PrintWriter): TreePrinter
 
   /** Renders internal structure of a reflection artifact as the
    * visualization of a Scala syntax tree.
+   *
+   * @group Printers
    */
   def showRaw(any: Any, printTypes: BooleanFlag = None, printIds: BooleanFlag = None, printKinds: BooleanFlag = None, printMirrors: BooleanFlag = None): String =
     render(any, newRawTreePrinter(_), printTypes, printIds, printKinds, printMirrors)
 
   /** Hook to define what `showRaw(...)` means.
+   * @group Printers
    */
   protected def newRawTreePrinter(out: PrintWriter): TreePrinter
 
   /** Renders a prettified representation of a name.
+   * @group Printers
    */
   def show(name: Name): String
 
   /** Renders internal structure of a name.
+   * @group Printers
    */
   def showRaw(name: Name): String = name.toString
 
   /** Renders a prettified representation of a flag set.
+   * @group Printers
    */
   def show(flags: FlagSet): String
 
   /** Renders internal structure of a flag set.
+   * @group Printers
    */
   def showRaw(flags: FlagSet): String = flags.toString
 }

@@ -201,6 +201,7 @@ package api
  * For more information about `Mirrors`s, see the
  * [[http://docs.scala-lang.org/overviews/reflection/environment-universes-mirrors.html Reflection Guide: Mirrors]]
  *
+ *  @contentDiagram hideNodes "*Api"
  */
 trait Mirrors { self: Universe =>
 
@@ -208,15 +209,19 @@ trait Mirrors { self: Universe =>
    *
    *  This abstract type conforms the base interface for all mirrors defined in [[scala.reflect.api.Mirror]]
    *  and is gradually refined in specific universes (e.g. `Mirror` of a [[scala.reflect.api.JavaUniverse]] is capable of reflection).
+   *  @group Mirrors
    */
   type Mirror >: Null <: scala.reflect.api.Mirror[self.type]
 
   /** The root mirror of this universe. This mirror contains standard Scala classes and types such as `Any`, `AnyRef`, `AnyVal`,
    *  `Nothing`, `Null`, and all classes loaded from scala-library, which are shared across all mirrors within the enclosing universe.
+   *  @group Mirrors
    */
   val rootMirror: Mirror
 
-  /** Abstracts the runtime representation of a class on the underlying platform. */
+  /** Abstracts the runtime representation of a class on the underlying platform.
+   *  @group Mirrors
+   */
   type RuntimeClass >: Null
 
   // todo. an improvement might be having mirrors reproduce the structure of the reflection domain
@@ -225,6 +230,7 @@ trait Mirrors { self: Universe =>
 
   /** A mirror that reflects a runtime value.
    *  See [[scala.reflect.api.package the overview page]] for details on how to use runtime reflection.
+   *  @group Mirrors
    */
   trait InstanceMirror {
 
@@ -301,6 +307,7 @@ trait Mirrors { self: Universe =>
 
   /** A mirror that reflects a field.
    *  See [[scala.reflect.api.package the overview page]] for details on how to use runtime reflection.
+   *  @group Mirrors
    */
   trait FieldMirror {
 
@@ -345,6 +352,7 @@ trait Mirrors { self: Universe =>
 
   /** A mirror that reflects a method.
    *  See [[scala.reflect.api.package the overview page]] for details on how to use runtime reflection.
+   *  @group Mirrors
    */
   trait MethodMirror {
 
@@ -365,6 +373,7 @@ trait Mirrors { self: Universe =>
 
   /** A mirror that reflects the instance or static parts of a runtime class.
    *  See [[scala.reflect.api.package the overview page]] for details on how to use runtime reflection.
+   *  @group Mirrors
    */
   trait TemplateMirror {
 
@@ -383,6 +392,7 @@ trait Mirrors { self: Universe =>
 
   /** A mirror that reflects a Scala object definition or the static parts of a runtime class.
    *  See [[scala.reflect.api.package the overview page]] for details on how to use runtime reflection.
+   *  @group Mirrors
    */
   trait ModuleMirror extends TemplateMirror {
 
@@ -398,6 +408,7 @@ trait Mirrors { self: Universe =>
 
   /** A mirror that reflects the instance parts of a runtime class.
    *  See [[scala.reflect.api.package the overview page]] for details on how to use runtime reflection.
+   *  @group Mirrors
    */
   trait ClassMirror extends TemplateMirror {
 
@@ -419,6 +430,7 @@ trait Mirrors { self: Universe =>
 
   /** A mirror that reflects instances and static classes.
    *  See [[scala.reflect.api.package the overview page]] for details on how to use runtime reflection.
+   *  @group Mirrors
    */
   trait ReflectiveMirror extends scala.reflect.api.Mirror[Mirrors.this.type] {
 
@@ -456,6 +468,7 @@ trait Mirrors { self: Universe =>
 
   /** The API of a mirror for a reflective universe.
    *  See [[scala.reflect.api.package the overview page]] for details on how to use runtime reflection.
+   *  @group Mirrors
    */
   trait RuntimeMirror extends ReflectiveMirror { self =>
 

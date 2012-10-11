@@ -10,13 +10,19 @@ package api
  *
  *  For more information about `Mirrors`s, see [[scala.reflect.api.Mirrors]] or the
  *  [[http://docs.scala-lang.org/overviews/reflection/environment-universes-mirrors.html Reflection Guide: Mirrors]]
+ *
+ *  @groupname JavaMirrors Java Mirrors
  */
 trait JavaMirrors { self: JavaUniverse =>
 
-  /** In runtime reflection universes, runtime representation of a class is [[java.lang.Class]]. */
+  /** In runtime reflection universes, runtime representation of a class is `java.lang.Class`.
+   *  @group JavaMirrors
+   */
   type RuntimeClass = java.lang.Class[_]
 
-  /** In runtime reflection universes, mirrors are `JavaMirrors`. */
+  /** In runtime reflection universes, mirrors are `JavaMirrors`.
+   *  @group JavaMirrors
+   */
   override type Mirror >: Null <: JavaMirror
 
   /** A refinement of [[scala.reflect.api.Mirror]] for runtime reflection using JVM classloaders.
@@ -27,6 +33,8 @@ trait JavaMirrors { self: JavaUniverse =>
    *
    *  For more information about `Mirrors`s, see [[scala.reflect.api.Mirrors]] or the
    * [[http://docs.scala-lang.org/overviews/reflection/environment-universes-mirrors.html Reflection Guide: Mirrors]]
+   *
+   *  @group JavaMirrors
    */
   trait JavaMirror extends scala.reflect.api.Mirror[self.type] with RuntimeMirror {
     val classLoader: ClassLoader
@@ -37,6 +45,8 @@ trait JavaMirrors { self: JavaUniverse =>
    *
    *  For more information about `Mirrors`s, see [[scala.reflect.api.Mirrors]] or the
    * [[http://docs.scala-lang.org/overviews/reflection/environment-universes-mirrors.html Reflection Guide: Mirrors]]
+   *
+   *  @group JavaMirrors
    */
   def runtimeMirror(cl: ClassLoader): Mirror
 }

@@ -1155,7 +1155,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       "during phase"       -> ( if (globalPhase eq phase) phase else "global=%s, atPhase=%s".format(globalPhase, phase) ),
       "library version"    -> scala.util.Properties.versionString,
       "compiler version"   -> Properties.versionString,
-      "reconstructed args" -> settings.recreateArgs.mkString(" ")
+      "reconstructed args" -> settings.recreateArgs.mkString(" "),
+      "jvm args"           -> java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments()
     )
     val info2 = formatExplain(
       "last tree to typer" -> tree.summaryString,

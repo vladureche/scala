@@ -1,7 +1,7 @@
 package scala.reflect
 package api
 
-/** A mirror-aware factory for trees.
+/** This is an internal implementation class.
  *
  * This class is used internally by Scala Reflection, and is not recommended for use in client code.
  */

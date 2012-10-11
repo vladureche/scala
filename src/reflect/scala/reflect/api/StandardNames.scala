@@ -14,19 +14,29 @@ package api
  *  Standard names are names that are essential to creating trees or to reflecting Scala artifacts.
  *  For example, `CONSTRUCTOR` (aka `<init>` on JVM) is necessary to create and invoke constructors.
  *
- *  These standard names can be referred to using `nme` for term names (listed in [[scala.reflect.api.StandardNames#TermNamesApi]])
- *  and using `tpnme` for type names (listed in [[scala.reflect.api.StandardNames#TypeNamesApi]])
+ *  These standard names can be referred to using [[nme `nme`]] for term names and [[tpnme `tpnme`]] for type names
+ *
+ *  @see [[Names]]
+ *
+ *  The API for names in Scala reflection.
+ *  @groupname StandardNames Standard Names
  */
 trait StandardNames {
   self: Universe =>
 
-  /** A value containing all standard term names. */
+  /** A value containing all [[TermNamesApi standard term names]].
+   *  @group StandardNames
+   */
   val nme: TermNamesApi
 
-  /** A value containing all standard type names. */
+  /** A value containing all [[TypeNamesApi standard type names]].
+   *  @group StandardNames
+   */
   val tpnme: TypeNamesApi
 
-  /** Defines standard names, common for term and type names. */
+  /** Defines standard names, common for term and type names: These can be accessed via the [[nme]] and [[tpnme]] members.
+   *  @group API
+   */
   trait NamesApi {
     /** An abstract type that represents the exact flavor of the name. */
     type NameType >: Null <: Name
@@ -38,8 +48,8 @@ trait StandardNames {
 
     /** The term or type name corresponding to an empty string.
      *  Represents an empty name, used to denote the fact that no name was specified
-     *  for `privateWithin` in [[scala.reflect.api.Trees#Modifiers]], for [[scala.reflect.api.Trees#This]],
-     *  for [[scala.reflect.api.Trees#Super]], etc.
+     *  for `privateWithin` in [[Trees#Modifiers]], for [[Trees#This]],
+     *  for [[Trees#Super]], etc.
      */
     val EMPTY: NameType
 
@@ -54,7 +64,9 @@ trait StandardNames {
     val PACKAGE: NameType
   }
 
-  /** Defines standard term names. */
+  /** Defines standard term names that can be accessed via the [[nme]] member.
+   *  @group API
+   */
   trait TermNamesApi extends NamesApi {
     /** @inheritdoc */
     type NameType = TermName
@@ -77,7 +89,9 @@ trait StandardNames {
     val LOCAL_SUFFIX_STRING: String
   }
 
-  /** Defines standard type names. */
+  /** Defines standard type names that can be accessed via the [[tpnme]] member.
+   *  @group API
+   */
   trait TypeNamesApi extends NamesApi {
     /** @inheritdoc */
     type NameType = TypeName
