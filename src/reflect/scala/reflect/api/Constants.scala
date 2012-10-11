@@ -6,9 +6,7 @@
 package scala.reflect
 package api
 
-/** A slice of [[scala.reflect.api.Universe the Scala reflection cake]] that defines compile-time constants and operations on them.
- *  See [[scala.reflect.api.Universe]] for a description of how the reflection API is encoded with the cake pattern.
- *
+/**
  *  According to the section 6.24 "Constant Expressions" of the Scala language specification,
  *  certain expressions (dubbed ''constant expressions'') can be evaluated by the Scala compiler at compile-time.
  *

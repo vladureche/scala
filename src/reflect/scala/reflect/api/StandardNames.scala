@@ -10,8 +10,7 @@ package api
 //    Is it necessary to perform reflection (like ERROR or LOCAL_SUFFIX_STRING)? If yes, then sure.
 //    Otherwise you'd better not - reflection API should stay minimalistic.
 
-/** A slice of [[scala.reflect.api.Universe the Scala reflection cake]] that defines standard names.
- *
+/**
  *  Standard names are names that are essential to creating trees or to reflecting Scala artifacts.
  *  For example, `CONSTRUCTOR` (aka `<init>` on JVM) is necessary to create and invoke constructors.
  *

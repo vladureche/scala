@@ -7,13 +7,13 @@ package api
  *  distinguish names of terms (like objects or members) and types. A term and a type of the
  *  same name can co-exist in an object. 
  *  
- *  @see [[http://docs.scala-lang.org/overviews/reflection/overview.html]].
-
  *  === Examples ===
  *
  *  To search for the `map` method (which is a term) declared in the `List` class,
  *  use `typeOf[List[_]].member(newTermName("map"))`. To search for a type member, use
  *  newTypeName instead.
+ *
+ *  See the [[docs.scala-lang.org/overviews/reflection/overview.html Reflection Guide]] for more about Scala Reflection.
  *
  */
 trait Names {

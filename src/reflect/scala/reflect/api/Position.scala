@@ -42,16 +42,6 @@ import scala.reflect.macros.Attachments
  *  `pos.makeTransparent` converts an opaque range position into a transparent one.
  *                        returns all other positions unchanged.
  *
- *  === Known issues ===
- *
- *  As it currently stands, positions cannot be created by a programmer - they only get emitted by the compiler
- *  and can only be reused in compile-time macro universes.
- *
- *  Also positions are neither pickled (i.e. saved for runtime reflection using standard means of scalac) nor
- *  reified (i.e. saved for runtime reflection using the [[scala.reflect.api.Universe#reify]] macro).
- *
- *  This API is considered to be a candidate for redesign. It is quite probable that in future releases of the reflection API
- *  positions will undergo a dramatic rehash.
  */
 trait Position extends Attachments {
 
