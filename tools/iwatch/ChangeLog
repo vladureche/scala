@@ -1,0 +1,111 @@
+iWatch: Realtime filesystem monitor
+
+version 0.2.2 (8. November 2009)
+* Changes/New Features:
+  - Fix the bug where the file being watched contains one of the formats 
+    available for substitution (thanks to Hanno Hecker for the patch).
+  - Watch the renamed/moved directory properly. In the previous version, 
+    after a directory was moved/renamed, iwatch used the old name if 
+    an event occurs.
+  - Fix unnecessary watching of create event. In the previous version,
+    create event was watched although it is not specified.  
+  - Add a functionality to specify the charset in command line mode 
+    (using option -C charset) and in daemon mode (as attribute in config tag)
+  - Add a functionality to reload the configuration file using the SIGHUP signal.
+
+version 0.2.1 (12. March 2007)
+* Changes/New Features:
+  - Option -X was added. It is exception with regex string.
+  - New string format in command option:
+      %c Event cookie number.
+      %e Event name.
+      %F The old filename in case moved_to event.
+  - Fix the problem with email, it send now email for all defined events.
+
+version 0.2.0 (25. January 2007):
+* Changes/New Features:
+  - It validates now the xml file using iwatch.dtd file.
+  - Dependency was changed from XML::Simple to XML::SimpleObject::LibXML,
+    this is necessary for XML validation using DTD file.
+  - This is a test version due of change from XML::Simple to XML::SimpleObject::LibXML.
+
+version 0.1.0 (14. January 2007):
+* Changes/fixes:
+  - Because it's already stable and there is no major problem
+    since few months, we move from alpha status to beta.
+  - Give a warning if it can't watch the file/directory.
+  - Update the documentation with information about DTD.
+    Thanks to Oliver Frommel for the bug report and suggestion to use DTD
+    for the validation of xml configuration file. It will be implemented in 
+    the next release.
+
+version 0.0.12 (2. November 2006):
+* New Features:
+  - Options --help, --version are now supported, thanks to Michael Prokop <mika@grml.org> for this suggestion 
+    and his supports to this project.
+  - It supports pid file by default at /var/run/iwatch.pid, and can be changed with
+    option -p. Thanks to Alexander 'formorer' Wirt for this patch and also his supports to this 
+    project.
+
+version 0.0.11 (28. September 2006):
+* Changes/fixes:
+  - Option -q is removed again because it is not necessary anymore.
+  - The List of monitored directories is now per default neither printed out nor in syslog, 
+    but it could be enabled with option -v
+    
+version 0.0.10 (27. September 2006):
+* New Features:
+  - Add option -q quite mode, no print out in console or syslog for each monitored directory.
+* Changes/fixes:
+  - Problem in watching root directory "/" is solved.
+
+version 0.0.9 (17. September 2006):
+* New Features:
+  - Add option -t <filter string> or filter="regex string". It will report only events
+    if the file/directory name matchs the filter string. It is useful if you watch a file like
+    /etc/passwd or /etc/shadow. Instead watching this single file, just watch the /etc directory
+    with filter="passwd|shadow", because if you watch only the passwd/shadow file, the watcher will
+    be deleted after one change of this file, and you will not get another notifications. 
+    This is caused by the application that changes passwd or shadow (e.g. passwd or chfn), they don't 
+    change the files directly, but create a new file and move it to passwd or shadow file, this will
+    remove the inode and therefore the watcher.
+
+version 0.0.8 (20. August 2006):
+* Security:
+  - Now using taint mode ("-T") to improve the security
+* Changes/Fixes:
+  - Syslog message is disabled per default, but it can be enabled or disabled
+    in each watched directory/file. Use syslog="on" in configuration file 
+    or option -s to enable the syslog report.
+  - In command line mode, the option -w is deprecated. Instead, we can put the directory/file name
+    in the argument without option -w (e.g. ./iwatch /bin)
+* New:
+  - Add time stamp in the output.
+
+version 0.0.7 (18. August 2006):
+* New Features:
+  - Add syslog
+version 0.0.6 (18. August 2006):
+* Changes/fixes:
+  - Remove dependency to the module String::Format,
+  - Remove date string format.
+  - Add option 'h' for usage/help.
+
+version 0.0.5 (14. August 2006):
+* New Features:
+  - Separate the command in to daemon mode and command line mode.
+  - You can specify a command to be executed if an event occurs
+  - You can specify difference events you want to watch.
+  - You can enable/disable email notification.
+
+version 0.0.4 (10. August 2006):
+* My Cat Simba ate this version.
+	
+version 0.0.3 (7. August 2006):
+* Fixes.
+
+version 0.0.2 (6. August 2006):
+* First release in sourceforge and few fixes.
+	
+version 0.0.1 (14. October 2005):
+* The very very first test release in enemy.org :)

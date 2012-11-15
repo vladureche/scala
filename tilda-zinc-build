@@ -1,0 +1,11 @@
+#!/bin/bash
+
+#
+# This little script will watch your repository and issue a build
+# on any source file change. Until we get an sbt build, it should
+# do the job.
+#
+
+zinc -shutdown
+[[ -d bootstrap ]] || (ant && cp -r build/pack bootstrap) # stupid bootstrapping :(
+tools/iwatch/iwatch-hacked -c './zinc-build all' -e modify -r -t '.*\.scala$' src

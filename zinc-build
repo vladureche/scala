@@ -5,7 +5,7 @@ elapsedTime () {
   ( TIMEFORMAT='%3R' && time eval "$@" || exit $? ) 2>&1 1>/dev/null | tail -1
 }
 
-BOOTSTRAP=/scala/inst/210
+BOOTSTRAP=bootstrap/
 ANT=$(ant -diagnostics |grep ^ant.core.lib | sed 's/^ant.core.lib: //')
 ASM=build/locker/classes/asm
 AUXCP=$ASM:$ANT:lib/msil.jar:lib/forkjoin.jar:lib/jline.jar:lib/fjbg.jar
@@ -42,7 +42,7 @@ compile () {
   run zinc -nailed \
     -scala-home $scalaHome \
     -d build/$layer/classes/$fileset \
-    -classpath $(cpof build/$layer/classes):$AUXCP \
+    -classpath $(tools/cpof build/$layer/classes):$AUXCP \
     $(find src/$fileset -name '*.scala' -o -name '*.java') && \
         touch $stamp
 }
@@ -162,7 +162,7 @@ unlockLocker () {
 
 runClean () {
   for dir in "$@"; do
-    ( cd "$dir" && rm -rf $( ls -1 | grep -v ^cache$ ) )
+    ( [[ -d $dir ]] && cd "$dir" && rm -rf $( ls -1 | grep -v ^cache$ ) )
   done
 }
 
