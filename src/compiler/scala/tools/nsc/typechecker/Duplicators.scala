@@ -174,6 +174,16 @@ abstract class Duplicators extends Analyzer {
             invalidateAll(tparams ::: vparamss.flatten)
             tree.symbol = NoSymbol
 
+          case _: TypeDef | _: ClassDef =>
+            tree.symbol = NoSymbol
+            // TODO: Is there a better way to do this?
+            tree match {
+              // TODO: Should set the owner, but we don't have a symbol yet
+              case t: TypeDef  => invalidateAll(t.tparams)
+              case c: ClassDef => invalidateAll(c.tparams)
+              case _ => assert(false, "Duplicator does not cover all cases!")
+            }
+
           case _ =>
             tree.symbol = NoSymbol
         }
