@@ -2128,6 +2128,10 @@ trait Types
         trivial = fromBoolean(!sym.isTypeParameter && pre.isTrivial && areTrivialTypes(args))
       toBoolean(trivial)
     }
+
+    def isInfixType = InfixAnnotationClass != NoSymbol &&
+                      sym.hasAnnotation(InfixAnnotationClass)
+
     private[scala] def invalidateCaches(): Unit = {
       parentsPeriod = NoPeriod
       baseTypeSeqPeriod = NoPeriod
@@ -2293,6 +2297,8 @@ trait Types
               xs.init.mkString("(", ", ", ")") + " => " + xs.last
           }
         }
+        else if (isInfixType && args.length == 2)
+          args(0) + " " + sym.decodedName + " " + args(1)
         else if (isTupleTypeDirect(this))
           tupleTypeString
         else if (sym.isAliasType && prefixChain.exists(_.termSymbol.isSynthetic) && (this ne dealias))

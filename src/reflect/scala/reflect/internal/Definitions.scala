@@ -1367,6 +1367,8 @@ trait Definitions extends api.StandardDefinitions {
       case _                  => false
     }
 
+    lazy val InfixAnnotationClass = rootMirror.getRequiredClass("scala.annotation.infix")
+
     // todo: reconcile with javaSignature!!!
     def signature(tp: Type): String = {
       def erasure(tp: Type): Type = tp match {
